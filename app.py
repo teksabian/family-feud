@@ -1892,6 +1892,11 @@ def join():
     
     return render_template('join.html')
 
+@app.route('/terms')
+def terms():
+    """Terms and conditions page"""
+    return render_template('terms.html')
+
 @app.route('/join/validate-code', methods=['POST'])
 def validate_code():
     """Step 1: Validate team code"""
