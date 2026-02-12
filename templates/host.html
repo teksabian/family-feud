@@ -864,7 +864,7 @@
                                     <div style="font-size: 0.9em;">
                                         {% if code.used %}
                                         <span style="display: inline-flex; align-items: center; gap: 6px;">
-                                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: {% if code.is_active %}#28a745{% else %}#6c757d{% endif %};" title="{% if code.is_active %}Online{% else %}Offline{% endif %}"></span>
+                                            <span class="status-dot" style="background: #6c757d;" title="Loading..."></span>
                                             🏆 Used by {{ code.team_name }}{% if code.reconnected %} 🔄{% endif %}
                                         </span>
                                         {% else %}
@@ -1392,6 +1392,37 @@
                 alert('Failed to reclaim code. Please try again.');
             });
         }
+        
+        // Team status polling - update online/offline dots
+        async function updateTeamStatus() {
+            try {
+                const response = await fetch('/host/team-status');
+                const teams = await response.json();
+                
+                teams.forEach(team => {
+                    const codeItem = document.querySelector(`.code-item[data-code="${team.code}"]`);
+                    if (!codeItem || !team.used) return;
+                    
+                    const statusDot = codeItem.querySelector('.status-dot');
+                    if (!statusDot) return;
+                    
+                    // Update dot color and tooltip
+                    if (team.is_online) {
+                        statusDot.style.background = '#28a745'; // Green
+                        statusDot.title = `Online - Last seen: ${team.last_seen_text}`;
+                    } else {
+                        statusDot.style.background = '#6c757d'; // Grey
+                        statusDot.title = `Offline - Last seen: ${team.last_seen_text}`;
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating team status:', error);
+            }
+        }
+        
+        // Poll team status every 10 seconds
+        setInterval(updateTeamStatus, 10000);
+        updateTeamStatus(); // Initial update
     </script>
     
     <style>
@@ -1404,11 +1435,20 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            cursor: help;
+            transition: background 0.3s;
+        }
     </style>
     
     <!-- Version Number - Bottom Right -->
     <div style="position: fixed; bottom: 20px; right: 20px; color: rgba(255,215,0,0.6); font-size: 0.85em; font-weight: bold; z-index: 1000; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-        v1.1.0-NUCLEAR
+        v1.1.1-NUCLEAR
     </div>
     
     {% include '_toast.html' %}

@@ -2166,8 +2166,20 @@ def join_submit():
             return render_template('join.html', error="Invalid code")
         
         if code_row['used']:
-            return render_template('join.html', error="Code already used")
+            # Code is already used - check if it's the same team trying to rejoin
+            if code_row['team_name'] and code_row['team_name'].lower() == team_name.lower():
+                # Same team rejoining - allow it and restore session
+                logger.info(f"Team '{team_name}' rejoining with code {code}")
+                session['code'] = code
+                session['team_name'] = team_name
+                session['startup_id'] = STARTUP_ID
+                session['reset_counter'] = RESET_COUNTER
+                return redirect(url_for('team_play'))
+            else:
+                # Different team trying to use an already-used code
+                return render_template('join.html', error="Code already used by another team")
         
+        # Code is unused - claim it
         conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?", (team_name, code))
         conn.commit()
         
@@ -2198,6 +2210,50 @@ def heartbeat():
         conn.commit()
     
     return jsonify({"success": True})
+
+@app.route('/host/team-status')
+@host_required
+def get_team_status():
+    """Get status of all teams (online/offline) for host dashboard"""
+    with db_connect() as conn:
+        teams = conn.execute("""
+            SELECT code, team_name, used, last_heartbeat,
+                   CASE 
+                       WHEN last_heartbeat IS NULL THEN 0
+                       WHEN (julianday('now') - julianday(last_heartbeat)) * 86400 <= 15 THEN 1
+                       ELSE 0
+                   END as is_online
+            FROM team_codes
+            ORDER BY code
+        """).fetchall()
+        
+        result = []
+        for team in teams:
+            team_dict = dict(team)
+            # Calculate last seen time
+            if team['last_heartbeat']:
+                from datetime import datetime
+                try:
+                    last_seen = datetime.fromisoformat(team['last_heartbeat'].replace('Z', '+00:00'))
+                    now = datetime.now(last_seen.tzinfo) if last_seen.tzinfo else datetime.now()
+                    seconds_ago = int((now - last_seen).total_seconds())
+                    
+                    if seconds_ago < 60:
+                        team_dict['last_seen_text'] = f"{seconds_ago} seconds ago"
+                    elif seconds_ago < 3600:
+                        minutes = seconds_ago // 60
+                        team_dict['last_seen_text'] = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+                    else:
+                        hours = seconds_ago // 3600
+                        team_dict['last_seen_text'] = f"{hours} hour{'s' if hours != 1 else ''} ago"
+                except:
+                    team_dict['last_seen_text'] = "Unknown"
+            else:
+                team_dict['last_seen_text'] = "Never"
+            
+            result.append(team_dict)
+        
+        return jsonify(result)
 
 @app.route('/api/check-round-status')
 def check_round_status():

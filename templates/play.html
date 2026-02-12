@@ -651,6 +651,18 @@
         async function checkForRound() {
             try {
                 const response = await fetch('/api/check-round-status');
+                
+                // Check for 401 status (session invalid - server restart or game reset)
+                if (response.status === 401) {
+                    const data = await response.json();
+                    if (data.reload) {
+                        // Game was reset or server restarted - reload to show game over page
+                        console.log('Session invalid - reloading page');
+                        window.location.reload();
+                        return;
+                    }
+                }
+                
                 const data = await response.json();
                 
                 // Check for sleep mode
@@ -667,6 +679,41 @@
                 console.error('Polling error:', error);
             }
         }
+        
+        // Heartbeat - ping server every 10 seconds to show team is online
+        let heartbeatInterval;
+        
+        function sendHeartbeat() {
+            fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch(err => console.error('Heartbeat error:', err));
+        }
+        
+        function startHeartbeat() {
+            heartbeatInterval = setInterval(sendHeartbeat, 10000); // Every 10 seconds
+            sendHeartbeat(); // Send immediately
+        }
+        
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+        }
+        
+        // Page Visibility API - stop heartbeat when tab is hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopHeartbeat(); // Tab hidden - stop pinging (phone locked, switched app, etc.)
+            } else {
+                startHeartbeat(); // Tab visible - resume pinging
+            }
+        });
+        
+        // Start heartbeat on page load
+        startHeartbeat();
         
         // Poll every 5 seconds
         setInterval(checkForRound, 5000);
@@ -792,6 +839,18 @@
         async function checkForNextRound() {
             try {
                 const response = await fetch('/api/check-round-status');
+                
+                // Check for 401 status (session invalid - server restart or game reset)
+                if (response.status === 401) {
+                    const data = await response.json();
+                    if (data.reload) {
+                        // Game was reset or server restarted - reload to show game over page
+                        console.log('Session invalid - reloading page');
+                        window.location.reload();
+                        return;
+                    }
+                }
+                
                 const data = await response.json();
                 
                 // Check for sleep mode
@@ -809,6 +868,40 @@
                 console.error('Polling error:', error);
             }
         }
+        
+        // Heartbeat - ping server every 10 seconds to show team is online
+        let heartbeatInterval;
+        
+        function sendHeartbeat() {
+            fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch(err => console.error('Heartbeat error:', err));
+        }
+        
+        function startHeartbeat() {
+            heartbeatInterval = setInterval(sendHeartbeat, 10000);
+            sendHeartbeat();
+        }
+        
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+        }
+        
+        // Page Visibility API
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopHeartbeat();
+            } else {
+                startHeartbeat();
+            }
+        });
+        
+        startHeartbeat();
         
         // Poll every 5 seconds
         setInterval(checkForNextRound, 5000);
@@ -895,6 +988,18 @@
         async function checkForNextRound() {
             try {
                 const response = await fetch('/api/check-round-status');
+                
+                // Check for 401 status (session invalid - server restart or game reset)
+                if (response.status === 401) {
+                    const data = await response.json();
+                    if (data.reload) {
+                        // Game was reset or server restarted - reload to show game over page
+                        console.log('Session invalid - reloading page');
+                        window.location.reload();
+                        return;
+                    }
+                }
+                
                 const data = await response.json();
                 
                 // Check for sleep mode
@@ -910,6 +1015,40 @@
                 console.error('Polling error:', error);
             }
         }
+        
+        // Heartbeat - ping server every 10 seconds to show team is online
+        let heartbeatInterval;
+        
+        function sendHeartbeat() {
+            fetch('/api/heartbeat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch(err => console.error('Heartbeat error:', err));
+        }
+        
+        function startHeartbeat() {
+            heartbeatInterval = setInterval(sendHeartbeat, 10000);
+            sendHeartbeat();
+        }
+        
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+            }
+        }
+        
+        // Page Visibility API
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopHeartbeat();
+            } else {
+                startHeartbeat();
+            }
+        });
+        
+        startHeartbeat();
         
         setInterval(checkForNextRound, 5000);
         setInterval(checkBroadcastMessage, 5000);
