@@ -238,6 +238,33 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: previous_score column added")
         
+        # Migration: Add last_heartbeat column to team_codes table (v1.1.0)
+        try:
+            conn.execute("SELECT last_heartbeat FROM team_codes LIMIT 1")
+        except:
+            logger.info("Adding last_heartbeat column to team_codes table...")
+            conn.execute("ALTER TABLE team_codes ADD COLUMN last_heartbeat TIMESTAMP DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: last_heartbeat column added")
+        
+        # Migration: Add reconnected column to team_codes table (v1.1.0)
+        try:
+            conn.execute("SELECT reconnected FROM team_codes LIMIT 1")
+        except:
+            logger.info("Adding reconnected column to team_codes table...")
+            conn.execute("ALTER TABLE team_codes ADD COLUMN reconnected INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Migration complete: reconnected column added")
+        
+        # Migration: Add winner_code column to rounds table (v1.1.0)
+        try:
+            conn.execute("SELECT winner_code FROM rounds LIMIT 1")
+        except:
+            logger.info("Adding winner_code column to rounds table...")
+            conn.execute("ALTER TABLE rounds ADD COLUMN winner_code TEXT DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: winner_code column added")
+        
         # Initialize default settings if they don't exist
         default_settings = [
             ('allow_team_registration', 'true', 'Allow new teams to join'),
@@ -410,7 +437,31 @@ def host_logout():
 def host_dashboard():
     """Main host dashboard"""
     with db_connect() as conn:
-        codes = conn.execute("SELECT code, used, team_name FROM team_codes ORDER BY id DESC").fetchall()
+        codes_raw = conn.execute("""
+            SELECT code, used, team_name, reconnected, last_heartbeat 
+            FROM team_codes 
+            ORDER BY id DESC
+        """).fetchall()
+        
+        # Process codes to add active status
+        codes = []
+        for code in codes_raw:
+            code_dict = dict(code)
+            # Calculate if team is active (heartbeat within last 30 seconds)
+            if code['last_heartbeat']:
+                from datetime import datetime, timedelta
+                try:
+                    # Parse timestamp
+                    last_hb = datetime.fromisoformat(code['last_heartbeat'])
+                    now = datetime.now()
+                    time_diff = (now - last_hb).total_seconds()
+                    code_dict['is_active'] = time_diff < 30
+                except:
+                    code_dict['is_active'] = False
+            else:
+                code_dict['is_active'] = False
+            codes.append(code_dict)
+        
         rounds = conn.execute("SELECT * FROM rounds ORDER BY round_number ASC").fetchall()
         active_round = conn.execute("SELECT * FROM rounds WHERE is_active = 1").fetchone()
         
@@ -430,7 +481,7 @@ def host_dashboard():
             """, (active_round['id'],)).fetchone()['cnt']
     
     return render_template('host.html', 
-                         codes=[dict(c) for c in codes],
+                         codes=codes,
                          rounds=[dict(r) for r in rounds],
                          active_round=dict(active_round) if active_round else None,
                          unscored_count=unscored_count,
@@ -530,6 +581,42 @@ def generate_codes():
     </body>
     </html>
     """
+
+@app.route('/host/reclaim-code/<code>', methods=['POST'])
+@host_required
+def reclaim_code(code):
+    """Reclaim a used code - removes team and frees code for reuse"""
+    code = code.upper()
+    
+    with db_connect() as conn:
+        code_row = conn.execute("SELECT * FROM team_codes WHERE code = ?", (code,)).fetchone()
+        
+        if not code_row:
+            return jsonify({"success": False, "message": "Code not found"}), 404
+        
+        if not code_row['used']:
+            return jsonify({"success": False, "message": "Code is not in use"}), 400
+        
+        team_name = code_row['team_name']
+        
+        # Delete all submissions for this team
+        conn.execute("DELETE FROM submissions WHERE code = ?", (code,))
+        
+        # Reset the code (mark as unused, clear team name and reconnect flag)
+        conn.execute("""
+            UPDATE team_codes 
+            SET used = 0, team_name = NULL, reconnected = 0, last_heartbeat = NULL 
+            WHERE code = ?
+        """, (code,))
+        
+        conn.commit()
+        
+        logger.info(f"Code reclaimed: {code} (was used by {team_name})")
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Code {code} reclaimed. Team '{team_name}' removed."
+        })
 
 @app.route('/host/print-codes')
 @host_required
@@ -1200,13 +1287,37 @@ def score_team(submission_id):
         # Store which answers were checked (e.g., "1,3,5")
         checked_answers_str = ','.join(map(str, sorted(checked_answers))) if checked_answers else ''
         
-        # Update submission
+        # Store current score as previous_score before updating (for undo functionality)
+        current_score = submission['score']
+        
+        # Update submission with new score and save previous
         conn.execute("""
             UPDATE submissions 
-            SET score = ?, scored = 1, scored_at = CURRENT_TIMESTAMP, checked_answers = ?
+            SET score = ?, scored = 1, scored_at = CURRENT_TIMESTAMP, checked_answers = ?, previous_score = ?
             WHERE id = ?
-        """, (score, checked_answers_str, submission_id))
+        """, (score, checked_answers_str, current_score, submission_id))
         conn.commit()
+        
+        # Check if all submissions for this round are scored
+        total_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?", 
+                                   (submission['round_id'],)).fetchone()['cnt']
+        scored_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND scored = 1", 
+                                    (submission['round_id'],)).fetchone()['cnt']
+        
+        # If all scored, find winner and update round
+        if total_subs > 0 and scored_subs == total_subs:
+            winner = conn.execute("""
+                SELECT code, score FROM submissions 
+                WHERE round_id = ? 
+                ORDER BY score DESC, tiebreaker DESC 
+                LIMIT 1
+            """, (submission['round_id'],)).fetchone()
+            
+            if winner:
+                conn.execute("UPDATE rounds SET winner_code = ? WHERE id = ?", 
+                           (winner['code'], submission['round_id']))
+                conn.commit()
+                logger.info(f"Round {submission['round_id']} winner: {winner['code']} with {winner['score']} points")
     
     # Check if AJAX request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1220,6 +1331,40 @@ def score_team(submission_id):
         # Traditional form submit (fallback)
         flash(f'{team_name} scored {score} points!', 'success')
         return redirect(url_for('scoring_queue'))
+
+@app.route('/host/undo-score/<int:submission_id>', methods=['POST'])
+@host_required
+def undo_score(submission_id):
+    """Undo the last score for a submission"""
+    with db_connect() as conn:
+        submission = conn.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
+        
+        if not submission:
+            return jsonify({"success": False, "message": "Submission not found"}), 404
+        
+        if submission['previous_score'] is None:
+            return jsonify({"success": False, "message": "No previous score to restore"}), 400
+        
+        # Get team name
+        team_info = conn.execute("SELECT team_name FROM team_codes WHERE code = ?", (submission['code'],)).fetchone()
+        team_name = team_info['team_name'] if team_info else 'Unknown Team'
+        
+        # Restore previous score
+        previous_score = submission['previous_score']
+        conn.execute("""
+            UPDATE submissions 
+            SET score = ?, previous_score = NULL
+            WHERE id = ?
+        """, (previous_score, submission_id))
+        conn.commit()
+        
+        logger.info(f"Undo score: {team_name} reverted from {submission['score']} to {previous_score}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"{team_name}'s score restored to {previous_score}",
+            "new_score": previous_score
+        })
 
 @app.route('/host/round-summary')
 @host_required
@@ -1920,9 +2065,54 @@ def validate_code():
             return render_template('join.html', error="Invalid code. Check your code and try again.")
         
         if code_row['used']:
-            return render_template('join.html', error="This code has already been used.")
+            # Code is in use - show reconnection form
+            return render_template('join.html', code=code, show_reconnect_form=True, existing_team=code_row['team_name'])
     
     return render_template('join.html', code=code, show_team_form=True)
+
+@app.route('/join/reconnect', methods=['POST'])
+def join_reconnect():
+    """Reconnect with existing team code"""
+    # Check if system is paused
+    if get_setting('system_paused', 'false') == 'true':
+        return render_template('join.html', error="⏸️ System is currently paused. Please wait for the host to resume.")
+    
+    code = request.form.get('code', '').strip().upper()
+    team_name = request.form.get('team_name', '').strip()
+    
+    if not code or not team_name:
+        return render_template('join.html', error="Please enter both code and team name")
+    
+    with db_connect() as conn:
+        code_row = conn.execute("SELECT * FROM team_codes WHERE code = ?", (code,)).fetchone()
+        
+        if not code_row:
+            return render_template('join.html', error="Invalid code")
+        
+        if not code_row['used']:
+            return render_template('join.html', error="This code hasn't been used yet. Use regular join.")
+        
+        # Case-insensitive team name comparison
+        if code_row['team_name'].lower() != team_name.lower():
+            return render_template('join.html', 
+                code=code, 
+                show_reconnect_form=True,
+                existing_team=code_row['team_name'],
+                error="❌ Team name doesn't match. This code belongs to another team. Get a new code from the host.")
+        
+        # Team name matches - mark as reconnected and create session
+        conn.execute("UPDATE team_codes SET reconnected = 1 WHERE code = ?", (code,))
+        conn.commit()
+        
+        # Create session
+        session['code'] = code
+        session['team_name'] = code_row['team_name']  # Use original capitalization
+        session['startup_id'] = STARTUP_ID
+        session['reset_counter'] = RESET_COUNTER
+        
+        logger.info(f"Team reconnected: {code_row['team_name']} (Code: {code})")
+        
+        return redirect(url_for('play'))
 
 @app.route('/join/submit', methods=['POST'])
 def join_submit():
@@ -1989,6 +2179,25 @@ def join_submit():
         session['reset_counter'] = RESET_COUNTER
         
         return redirect(url_for('team_play'))
+
+@app.route('/api/heartbeat', methods=['POST'])
+@team_session_valid
+def heartbeat():
+    """Update last heartbeat timestamp for active tab detection"""
+    code = session.get('code')
+    
+    if not code:
+        return jsonify({"success": False}), 401
+    
+    with db_connect() as conn:
+        conn.execute("""
+            UPDATE team_codes 
+            SET last_heartbeat = CURRENT_TIMESTAMP 
+            WHERE code = ?
+        """, (code,))
+        conn.commit()
+    
+    return jsonify({"success": True})
 
 @app.route('/api/check-round-status')
 def check_round_status():
@@ -2061,6 +2270,9 @@ def team_play():
         """, (code, active_round['id'])).fetchone()
         
         if submission:
+            # Get last_submission from session (for answer preview)
+            last_submission = session.pop('last_submission', None)
+            
             return render_template('play.html',
                                  team_name=team_name,
                                  code=code,
@@ -2069,7 +2281,8 @@ def team_play():
                                  num_answers=active_round['num_answers'],
                                  already_submitted=True,
                                  submissions_closed=active_round['submissions_closed'],
-                                 submission=dict(submission))
+                                 submission=dict(submission),
+                                 last_submission=last_submission)
     
     return render_template('play.html',
                          team_name=team_name,
@@ -2139,6 +2352,13 @@ def submit_answers():
             
             conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
             conn.commit()
+            
+            # Store submission for answer preview
+            session['last_submission'] = {
+                'round_id': round_id,
+                'answers': answers,
+                'tiebreaker': tiebreaker
+            }
         except sqlite3.IntegrityError:
             # Fallback: UNIQUE constraint caught it
             flash('✅ You have already submitted for this round!', 'warning')

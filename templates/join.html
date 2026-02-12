@@ -200,6 +200,43 @@
             </button>
         </form>
         
+        {% elif show_reconnect_form %}
+        <!-- Reconnection: Enter team name to reclaim code -->
+        <div style="background: rgba(255,193,7,0.2); border: 2px solid #ffc107; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <div style="font-size: 1.5em; font-weight: bold; color: #ffc107; margin-bottom: 10px;">
+                🔐 Code In Use
+            </div>
+            <div style="color: #fff; font-size: 1em; line-height: 1.6;">
+                This code is already being used by a team.<br>
+                If this is your team, enter your team name to reconnect.
+            </div>
+        </div>
+        
+        <form method="POST" action="{{ url_for('join_reconnect') }}">
+            <input type="hidden" name="code" value="{{ code }}">
+            
+            <div class="form-group">
+                <label for="team_name">Your Team Name</label>
+                <input type="text" 
+                       id="team_name" 
+                       name="team_name" 
+                       placeholder="Enter your team name to reconnect..." 
+                       required
+                       autocomplete="off"
+                       autofocus>
+            </div>
+            
+            <button type="submit">
+                🔄 Reconnect
+            </button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{{ url_for('join') }}" style="color: #ffd700; text-decoration: underline; font-size: 0.9em;">
+                ← Back to code entry
+            </a>
+        </div>
+        
         {% else %}
         <!-- Step 1: Enter code -->
         <form method="POST" action="{{ url_for('validate_code') }}">

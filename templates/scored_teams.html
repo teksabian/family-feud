@@ -242,9 +242,18 @@
                 
                 <div class="score">{{ sub.score }}</div>
                 
-                <a href="{{ url_for('edit_score', submission_id=sub.id) }}" class="btn edit-btn">
-                    ✏️ Edit
-                </a>
+                <div style="display: flex; gap: 10px;">
+                    <a href="{{ url_for('edit_score', submission_id=sub.id) }}" class="btn edit-btn">
+                        ✏️ Edit
+                    </a>
+                    {% if sub.previous_score is not none %}
+                    <button onclick="undoScore({{ sub.id }}, '{{ sub.team_name }}')" 
+                            class="btn" 
+                            style="background: #ff9800; border-color: #ff9800;">
+                        ↩️ Undo
+                    </button>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -256,5 +265,34 @@
         {% endif %}
     </div>
     {% include '_toast.html' %}
+    
+    <script>
+        function undoScore(submissionId, teamName) {
+            if (!confirm(`Undo the score for ${teamName}? This will restore their previous score.`)) {
+                return;
+            }
+            
+            fetch(`/host/undo-score/${submissionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    // Reload page to show updated score
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('Error: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error undoing score:', error);
+                showToast('Failed to undo score. Please try again.', 'error');
+            });
+        }
+    </script>
 </body>
 </html>
