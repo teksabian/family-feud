@@ -706,12 +706,13 @@
                 stopHeartbeat(); // Tab hidden - stop pinging (phone locked, switched app, etc.)
             } else {
                 startHeartbeat(); // Tab visible - resume pinging
+                checkForRound(); // Immediately check session/round status (browsers throttle background tabs)
             }
         });
-        
+
         // Start heartbeat on page load
         startHeartbeat();
-        
+
         // Poll every 5 seconds
         setInterval(checkForRound, 5000);
         setInterval(checkBroadcastMessage, 5000);
@@ -891,18 +892,19 @@
                 stopHeartbeat();
             } else {
                 startHeartbeat();
+                checkForNextRound(); // Immediately check session/round status (browsers throttle background tabs)
             }
         });
-        
+
         startHeartbeat();
-        
+
         // Poll every 5 seconds
         setInterval(checkForNextRound, 5000);
         setInterval(checkBroadcastMessage, 5000);
         // Check immediately
         checkBroadcastMessage();
     </script>
-    
+
     {% else %}
     <!-- ACTIVE ROUND - ANSWER SUBMISSION FORM -->
     
@@ -1035,17 +1037,18 @@
                 stopHeartbeat();
             } else {
                 startHeartbeat();
+                checkForNextRound(); // Immediately check session/round status (browsers throttle background tabs)
             }
         });
-        
+
         startHeartbeat();
-        
+
         setInterval(checkForNextRound, 5000);
         setInterval(checkBroadcastMessage, 5000);
         checkForNextRound();
         checkBroadcastMessage();
     </script>
-    
+
     {% else %}
     <!-- ANSWER SUBMISSION FORM (ROUND OPEN) -->
     <!-- Fixed Header -->
@@ -1420,6 +1423,7 @@
                 if (!heartbeatInterval) {
                     heartbeatInterval = setInterval(sendHeartbeat, 5000);  // Every 5 seconds
                 }
+                checkRoundStatus(); // Immediately check session/round status (browsers throttle background tabs)
             }
         }
         
