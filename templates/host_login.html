@@ -86,9 +86,7 @@
             background: rgba(255,255,255,0.1);
             color: #fff;
             border-radius: 8px;
-            text-align: center;
             font-family: monospace;
-            letter-spacing: 8px;
         }
         
         input[type="password"]:focus {
@@ -136,23 +134,22 @@
         </div>
         
         <h1>Host Login</h1>
-        <p class="subtitle">Enter PIN to access host dashboard</p>
+        <p class="subtitle">Enter password to access host dashboard</p>
         
         {% if error %}
         <div class="error">
-            ❌ Incorrect PIN - Try again
+            ❌ Incorrect password - Try again
         </div>
         {% endif %}
         
         <form method="POST">
             <div class="form-group">
-                <label for="pin">Host PIN:</label>
-                <input type="password" 
-                       id="pin" 
-                       name="pin" 
-                       placeholder="****" 
-                       maxlength="8"
-                       autofocus 
+                <label for="password">Host Password:</label>
+                <input type="password"
+                       id="password"
+                       name="password"
+                       placeholder="Enter password"
+                       autofocus
                        required>
             </div>
             
@@ -161,8 +158,8 @@
     </div>
     
     <script>
-        // Auto-focus on PIN input
-        document.getElementById('pin').focus();
+        // Auto-focus on password input
+        document.getElementById('password').focus();
     </script>
 </body>
 </html>

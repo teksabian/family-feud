@@ -55,6 +55,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
+APP_VERSION = "v1.1.3"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -73,12 +74,20 @@ logger.info(f"Reset counter initialized: {RESET_COUNTER}")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "feud.db")
 
-# Host PIN protection - set via environment variable or use default
-HOST_PIN = os.environ.get('HOST_PIN', '6551')
-logger.info(f"Host PIN protection enabled (PIN: {'custom' if os.environ.get('HOST_PIN') else 'default 6551'})")
+# Host password protection - set via environment variable or use default
+HOST_PASSWORD = os.environ.get('HOST_PASSWORD', 'localdev')
+if not os.environ.get('HOST_PASSWORD'):
+    logger.warning("No HOST_PASSWORD env var set — using default development password")
+else:
+    logger.info("Host password protection enabled (custom password set)")
+
+@app.context_processor
+def inject_version():
+    """Make app version available in all templates as {{ app_version }}"""
+    return dict(app_version=APP_VERSION)
 
 def host_required(f):
-    """Decorator to protect host routes - requires PIN authentication"""
+    """Decorator to protect host routes - requires password authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('host_authenticated'):
@@ -419,15 +428,15 @@ def index():
 
 @app.route('/host/login', methods=['GET', 'POST'])
 def host_login():
-    """Host login page - PIN authentication"""
+    """Host login page - password authentication"""
     if request.method == 'POST':
-        pin = request.form.get('pin', '')
-        if pin == HOST_PIN:
+        password = request.form.get('password', '')
+        if password == HOST_PASSWORD:
             session['host_authenticated'] = True
             logger.info("Host authenticated successfully")
             return redirect(url_for('host_dashboard'))
         else:
-            logger.warning(f"Failed host login attempt with PIN: {pin}")
+            logger.warning("Failed host login attempt")
             return render_template('host_login.html', error=True)
     return render_template('host_login.html', error=False)
 
