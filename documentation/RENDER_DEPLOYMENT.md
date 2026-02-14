@@ -55,7 +55,7 @@ Tells Render how to build and run the app:
 - Python 3.11
 - Install from requirements.txt
 - Start with Gunicorn
-- Environment variables (SECRET_KEY, HOST_PIN, RENDER)
+- Environment variables (SECRET_KEY, HOST_PASSWORD, RENDER)
 
 ### **4. .gitignore - NEW FILE**
 Prevents committing:
@@ -122,7 +122,7 @@ RENDER=true python app.py
 ```bash
 python app.py
 # Visit http://localhost:5000/host
-# Enter PIN: 6551
+# Enter password: localdev (default for local dev)
 # Should work same as before
 ```
 
@@ -144,7 +144,7 @@ Everything should work **exactly like before**:
 - ✅ Server starts on localhost:5000
 - ✅ Database creates/resets normally
 - ✅ Logs save to /logs/ directory
-- ✅ Host panel works (PIN: 6551)
+- ✅ Host panel works (password: localdev for local dev)
 - ✅ Teams can join
 - ✅ QR codes work
 - ✅ Scoring works

@@ -10,7 +10,6 @@ services:
         value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
-      - key: HOST_PIN
-        value: "6551"
+      # HOST_PASSWORD is set in Render dashboard (not in code)
       - key: RENDER
         value: "true"
