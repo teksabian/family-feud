@@ -7,6 +7,8 @@ import secrets
 import string
 import time
 import logging
+import urllib.request
+import urllib.error
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, render_template, redirect, url_for, jsonify, session, flash
@@ -83,6 +85,33 @@ logger.info(f"Reset counter initialized: {RESET_COUNTER}")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "feud.db")
+CORRECTIONS_FILE = os.path.join(BASE_DIR, "corrections_history.json")
+
+
+def load_corrections_history():
+    """Load persistent corrections from JSON file (survives deploys)."""
+    try:
+        if os.path.exists(CORRECTIONS_FILE):
+            with open(CORRECTIONS_FILE, 'r') as f:
+                data = json.load(f)
+                logger.info(f"[AI-CORRECTIONS] Loaded {len(data)} corrections from history file")
+                return data
+    except Exception as e:
+        logger.warning(f"[AI-CORRECTIONS] Failed to load corrections history: {e}")
+    return []
+
+
+def save_correction_to_history(correction):
+    """Append a correction to the persistent JSON file."""
+    try:
+        history = load_corrections_history()
+        history.append(correction)
+        with open(CORRECTIONS_FILE, 'w') as f:
+            json.dump(history, f, indent=2)
+        logger.info(f"[AI-CORRECTIONS] Saved correction to history file (total: {len(history)})")
+    except Exception as e:
+        logger.warning(f"[AI-CORRECTIONS] Failed to save correction to history: {e}")
+
 
 # Host password protection - set via environment variable or use default
 HOST_PASSWORD = os.environ.get('HOST_PASSWORD', 'localdev')
@@ -103,6 +132,14 @@ elif ENABLE_AI_SCORING and not ANTHROPIC_API_KEY:
     logger.warning("AI Scoring: DISABLED - ANTHROPIC_API_KEY not set")
 else:
     logger.info("AI Scoring: DISABLED (ENABLE_AI_SCORING not set)")
+
+# GitHub API for saving AI training data
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+GITHUB_REPO = os.environ.get('GITHUB_REPO', 'teksabian/family-feud')
+if GITHUB_TOKEN:
+    logger.info(f"GitHub API: ENABLED (repo: {GITHUB_REPO})")
+else:
+    logger.info("GitHub API: DISABLED (no GITHUB_TOKEN env var)")
 
 @app.context_processor
 def inject_version():
@@ -637,31 +674,17 @@ Survey Answers (the correct answers from the survey):
     for ans in team_answers:
         prompt += f"- {ans}\n"
 
-    # === Fetch past corrections for training ===
-    recent_corrections = []
-    try:
-        with db_connect() as corr_conn:
-            # Prioritize corrections from the same question, then global
-            same_q = corr_conn.execute("""
-                SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason
-                FROM ai_corrections WHERE question = ?
-                ORDER BY created_at DESC LIMIT 10
-            """, (question,)).fetchall()
+    # === Fetch past corrections for long-term training ===
+    # Load from persistent JSON file (survives deploys and DB resets)
+    all_corrections = load_corrections_history()
 
-            remaining = 10 - len(same_q)
-            global_corr = []
-            if remaining > 0:
-                global_corr = corr_conn.execute("""
-                    SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason
-                    FROM ai_corrections WHERE question != ?
-                    ORDER BY created_at DESC LIMIT ?
-                """, (question, remaining)).fetchall()
-
-            recent_corrections = [dict(c) for c in same_q] + [dict(c) for c in global_corr]
-            if recent_corrections:
-                logger.info(f"[AI-SCORING] Loaded {len(recent_corrections)} past corrections for training")
-    except Exception as e:
-        logger.warning(f"[AI-SCORING] Failed to load corrections: {e}")
+    # Prioritize: same question first, then all others (most recent last)
+    same_q = [c for c in all_corrections if c.get('question') == question]
+    other_q = [c for c in all_corrections if c.get('question') != question]
+    # Take up to 10 same-question + fill remaining with others, max 30 total
+    recent_corrections = same_q[-10:] + other_q[-20:]
+    if recent_corrections:
+        logger.info(f"[AI-SCORING] Loaded {len(recent_corrections)} corrections for training ({len(same_q)} same-question)")
 
     if recent_corrections:
         prompt += "\nPast Corrections (learn from these host overrides — apply similar logic to current answers):\n"
@@ -1775,6 +1798,11 @@ def score_team(submission_id):
                         INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason)
                         VALUES (?, ?, ?, ?, ?, ?, 'host_added', ?, ?)
                     """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason, host_note))
+                    save_correction_to_history({
+                        'team_answer': team_answer, 'survey_answer': survey_answer,
+                        'correction_type': 'host_added', 'ai_reasoning': ai_reason,
+                        'host_reason': host_note, 'question': round_info['question']
+                    })
                     corrections_count += 1
 
             for survey_num in host_removed:
@@ -1793,6 +1821,11 @@ def score_team(submission_id):
                         INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason)
                         VALUES (?, ?, ?, ?, ?, ?, 'host_removed', ?, ?)
                     """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason, host_note))
+                    save_correction_to_history({
+                        'team_answer': team_answer, 'survey_answer': survey_answer,
+                        'correction_type': 'host_removed', 'ai_reasoning': ai_reason,
+                        'host_reason': host_note, 'question': round_info['question']
+                    })
                     corrections_count += 1
 
             if corrections_count > 0:
@@ -2674,13 +2707,107 @@ def settings():
     broadcast_message = get_setting('broadcast_message', '')
     ai_scoring_enabled = get_setting('ai_scoring_enabled', 'true') == 'true'
 
+    # Count corrections in current session
+    corrections_count = len(load_corrections_history())
+
     return render_template('settings.html',
                          qr_base_url=current_qr_url,
                          allow_team_registration=allow_team_registration,
                          system_paused=system_paused,
                          broadcast_message=broadcast_message,
                          ai_scoring_available=AI_SCORING_ENABLED,
-                         ai_scoring_enabled=ai_scoring_enabled)
+                         ai_scoring_enabled=ai_scoring_enabled,
+                         corrections_count=corrections_count)
+
+@app.route('/host/save-training', methods=['POST'])
+@host_required
+def save_training():
+    """Save AI corrections to GitHub repo for long-term persistence."""
+    if not GITHUB_TOKEN:
+        return jsonify({'success': False, 'error': 'GITHUB_TOKEN not configured. Set it in Render environment variables.'}), 400
+
+    corrections = load_corrections_history()
+    if not corrections:
+        return jsonify({'success': False, 'error': 'No corrections to save.'}), 400
+
+    try:
+        file_path = 'corrections_history.json'
+        api_url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}'
+
+        # First, get the current file SHA (needed for updates)
+        get_req = urllib.request.Request(api_url, headers={
+            'Authorization': f'token {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json'
+        })
+
+        existing_sha = None
+        existing_data = []
+        try:
+            with urllib.request.urlopen(get_req) as resp:
+                file_info = json.loads(resp.read().decode())
+                existing_sha = file_info.get('sha')
+                # Decode existing content and merge
+                existing_content = base64.b64decode(file_info.get('content', '')).decode('utf-8')
+                existing_data = json.loads(existing_content) if existing_content.strip() else []
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                existing_data = []  # File doesn't exist yet
+            else:
+                raise
+
+        # Merge: add new corrections that aren't already in the file
+        # Use a simple dedup by converting to comparable tuples
+        existing_set = set()
+        for c in existing_data:
+            key = (c.get('team_answer', ''), c.get('survey_answer', ''), c.get('correction_type', ''), c.get('question', ''))
+            existing_set.add(key)
+
+        new_corrections = []
+        for c in corrections:
+            key = (c.get('team_answer', ''), c.get('survey_answer', ''), c.get('correction_type', ''), c.get('question', ''))
+            if key not in existing_set:
+                new_corrections.append(c)
+
+        if not new_corrections:
+            return jsonify({'success': True, 'message': f'All {len(corrections)} corrections already saved. No new data.'})
+
+        merged = existing_data + new_corrections
+        content_b64 = base64.b64encode(json.dumps(merged, indent=2).encode('utf-8')).decode('utf-8')
+
+        # Commit to GitHub
+        payload = json.dumps({
+            'message': f'Update AI training data (+{len(new_corrections)} corrections, {len(merged)} total)',
+            'content': content_b64,
+            'sha': existing_sha  # None if new file
+        }).encode('utf-8')
+
+        # Remove sha key if None (new file)
+        payload_dict = json.loads(payload)
+        if payload_dict.get('sha') is None:
+            del payload_dict['sha']
+        payload = json.dumps(payload_dict).encode('utf-8')
+
+        put_req = urllib.request.Request(api_url, data=payload, method='PUT', headers={
+            'Authorization': f'token {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+        })
+
+        with urllib.request.urlopen(put_req) as resp:
+            if resp.status in (200, 201):
+                logger.info(f"[AI-CORRECTIONS] Saved {len(new_corrections)} new corrections to GitHub ({len(merged)} total)")
+                return jsonify({'success': True, 'message': f'Saved {len(new_corrections)} new corrections to GitHub ({len(merged)} total)'})
+
+        return jsonify({'success': False, 'error': 'Unexpected response from GitHub'}), 500
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        logger.error(f"[AI-CORRECTIONS] GitHub API error: {e.code} - {error_body}")
+        return jsonify({'success': False, 'error': f'GitHub API error ({e.code}). Check your token permissions.'}), 500
+    except Exception as e:
+        logger.error(f"[AI-CORRECTIONS] Failed to save to GitHub: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/host/toggle-setting', methods=['POST'])
 @host_required

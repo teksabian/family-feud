@@ -469,6 +469,24 @@
         </div>
         {% endif %}
 
+        <!-- AI Training Data -->
+        {% if ai_scoring_available %}
+        <div class="card">
+            <h2>🧠 AI Training Data</h2>
+
+            <div class="help-text" style="margin-bottom: 15px;">
+                Save your scoring corrections to GitHub so AI learns your style across games.
+                <strong>{{ corrections_count }} correction{{ 's' if corrections_count != 1 else '' }}</strong> this session.
+            </div>
+
+            <button type="button" id="saveTrainingBtn" class="btn-save" onclick="saveTrainingData()" style="background: #667eea;">
+                💾 Save AI Training to GitHub
+            </button>
+
+            <div id="trainingStatus" class="help-text" style="margin-top: 10px; display: none;"></div>
+        </div>
+        {% endif %}
+
         <!-- Broadcast Message -->
         <div class="card">
             <h2>📢 Broadcast Message</h2>
@@ -644,6 +662,49 @@
             });
         }
         
+        // Save AI Training Data to GitHub
+        async function saveTrainingData() {
+            const btn = document.getElementById('saveTrainingBtn');
+            const status = document.getElementById('trainingStatus');
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Saving to GitHub...';
+            status.style.display = 'block';
+            status.style.color = 'rgba(255,255,255,0.7)';
+            status.textContent = 'Pushing corrections to repository...';
+
+            try {
+                const response = await fetch('/host/save-training', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    status.style.color = '#28a745';
+                    status.textContent = '✅ ' + data.message;
+                    btn.innerHTML = '✅ Saved!';
+                    btn.style.background = '#28a745';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.background = '#667eea';
+                        btn.disabled = false;
+                    }, 3000);
+                } else {
+                    status.style.color = '#dc3545';
+                    status.textContent = '❌ ' + (data.error || 'Failed to save');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                status.style.color = '#dc3545';
+                status.textContent = '❌ Network error. Try again.';
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
         // Check sleep status on page load
         window.addEventListener('DOMContentLoaded', function() {
             console.log('[SETTINGS] Checking initial sleep status');
