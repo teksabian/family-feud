@@ -785,7 +785,7 @@ def format_timestamp(timestamp_str):
 
 @app.route('/')
 def index():
-    return redirect(url_for('host_dashboard'))
+    return redirect(url_for('join'))
 
 @app.route('/host/login', methods=['GET', 'POST'])
 def host_login():
