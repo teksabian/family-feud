@@ -64,7 +64,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
-APP_VERSION = "v2.0.3 - Fusion"
+APP_VERSION = "v2.0.4 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -288,6 +288,7 @@ def init_db():
                 survey_num INTEGER,
                 correction_type TEXT NOT NULL,
                 ai_reasoning TEXT,
+                host_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -350,6 +351,15 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: winner_code column added")
         
+        # Migration: Add host_reason column to ai_corrections table (v2.0.4)
+        try:
+            conn.execute("SELECT host_reason FROM ai_corrections LIMIT 1")
+        except:
+            logger.info("Adding host_reason column to ai_corrections table...")
+            conn.execute("ALTER TABLE ai_corrections ADD COLUMN host_reason TEXT DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: host_reason column added")
+
         # Initialize default settings if they don't exist
         default_settings = [
             ('allow_team_registration', 'true', 'Allow new teams to join'),
@@ -501,7 +511,7 @@ Survey Answers (the correct answers from the survey):
         with db_connect() as corr_conn:
             # Prioritize corrections from the same question, then global
             same_q = corr_conn.execute("""
-                SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning
+                SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason
                 FROM ai_corrections WHERE question = ?
                 ORDER BY created_at DESC LIMIT 10
             """, (question,)).fetchall()
@@ -510,7 +520,7 @@ Survey Answers (the correct answers from the survey):
             global_corr = []
             if remaining > 0:
                 global_corr = corr_conn.execute("""
-                    SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning
+                    SELECT team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason
                     FROM ai_corrections WHERE question != ?
                     ORDER BY created_at DESC LIMIT ?
                 """, (question, remaining)).fetchall()
@@ -526,14 +536,14 @@ Survey Answers (the correct answers from the survey):
         for idx, corr in enumerate(recent_corrections, 1):
             if corr['correction_type'] == 'host_added':
                 prompt += f'{idx}. SHOULD match: "{corr["team_answer"]}" matches "{corr["survey_answer"]}"'
-                if corr['ai_reasoning']:
-                    prompt += f' (you previously thought: {corr["ai_reasoning"]})'
-                prompt += '\n'
             else:
                 prompt += f'{idx}. Should NOT match: "{corr["team_answer"]}" does NOT match "{corr["survey_answer"]}"'
-                if corr['ai_reasoning']:
-                    prompt += f' (you previously thought: {corr["ai_reasoning"]})'
-                prompt += '\n'
+            # Prioritize host's explanation over AI's original reasoning
+            if corr.get('host_reason'):
+                prompt += f' — Host says: "{corr["host_reason"]}"'
+            elif corr.get('ai_reasoning'):
+                prompt += f' (you previously thought: {corr["ai_reasoning"]})'
+            prompt += '\n'
         prompt += '\n'
 
     prompt += """
@@ -1583,6 +1593,7 @@ def score_team(submission_id):
         # === AI CORRECTIONS: Detect and store host overrides ===
         ai_matches_str = request.form.get('ai_matches', '').strip()
         ai_reasoning_str = request.form.get('ai_reasoning', '').strip()
+        ai_host_notes = request.form.get('ai_host_notes', '').strip()[:200]  # Max 200 chars
 
         if ai_matches_str:
             logger.info(f"[AI-CORRECTIONS] Processing corrections for submission_id={submission_id}")
@@ -1624,9 +1635,9 @@ def score_team(submission_id):
                             break
                 if team_answer:
                     conn.execute("""
-                        INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning)
-                        VALUES (?, ?, ?, ?, ?, ?, 'host_added', ?)
-                    """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason))
+                        INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason)
+                        VALUES (?, ?, ?, ?, ?, ?, 'host_added', ?, ?)
+                    """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason, ai_host_notes or None))
                     corrections_count += 1
 
             for survey_num in host_removed:
@@ -1641,13 +1652,15 @@ def score_team(submission_id):
                         break
                 if team_answer:
                     conn.execute("""
-                        INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning)
-                        VALUES (?, ?, ?, ?, ?, ?, 'host_removed', ?)
-                    """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason))
+                        INSERT INTO ai_corrections (round_id, submission_id, question, team_answer, survey_answer, survey_num, correction_type, ai_reasoning, host_reason)
+                        VALUES (?, ?, ?, ?, ?, ?, 'host_removed', ?, ?)
+                    """, (submission['round_id'], submission_id, round_info['question'], team_answer, survey_answer, survey_num, ai_reason, ai_host_notes or None))
                     corrections_count += 1
 
             if corrections_count > 0:
                 logger.info(f"[AI-CORRECTIONS] Stored {corrections_count} correction(s) for submission_id={submission_id}")
+                if ai_host_notes:
+                    logger.info(f"[AI-CORRECTIONS] Host note: \"{ai_host_notes}\"")
 
         conn.commit()
 

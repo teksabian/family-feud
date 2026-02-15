@@ -475,6 +475,52 @@
             font-size: 0.85em;
             margin-top: 2px;
         }
+
+        .ai-feedback {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #ffd700;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-top: 10px;
+        }
+
+        .ai-feedback-label {
+            color: #ffd700;
+            font-size: 0.85em;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .ai-feedback-textarea {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 6px;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+            padding: 8px 10px;
+            resize: vertical;
+            min-height: 40px;
+            max-height: 80px;
+        }
+
+        .ai-feedback-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .ai-feedback-textarea:focus {
+            outline: none;
+            border-color: #ffd700;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .ai-feedback-hint {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.75em;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -557,7 +603,7 @@
                                        name="answer_{{ i }}" 
                                        value="1" 
                                        {% if sub.auto_checks[i] %}checked{% endif %}
-                                       onchange="updateScore({{ sub.id }}, {{ round.num_answers }})">
+                                       onchange="updateScore({{ sub.id }}, {{ round.num_answers }}); checkForAIOverride({{ sub.id }})">
                                 <label class="checkbox-label">
                                     #{{ i }} {{ round['answer' ~ i] }}
                                 </label>
@@ -586,6 +632,14 @@
                         </button>
                         <div class="ai-reasoning-content" id="ai-reasoning-content-{{ sub.id }}" style="display:none;">
                         </div>
+                    </div>
+                    <div class="ai-feedback" id="ai-feedback-{{ sub.id }}" style="display:none;">
+                        <label class="ai-feedback-label">📝 Tell AI why you changed its scoring (optional):</label>
+                        <textarea name="ai_host_notes" id="ai-host-notes-{{ sub.id }}"
+                                  class="ai-feedback-textarea"
+                                  placeholder="e.g. 'moose counts as deer family' or 'too vague, not specific enough'"
+                                  maxlength="200"></textarea>
+                        <div class="ai-feedback-hint">This teaches the AI your scoring style for future rounds</div>
                     </div>
                     {% endif %}
 
@@ -773,6 +827,9 @@
     </script>
     
     <script>
+        // Track which submissions have been AI-scored (for override detection)
+        const aiScoredSubmissions = new Set();
+
         // AI Scoring Function
         async function scoreWithAI(submissionId, maxAnswers) {
             console.log(`[AI-SCORING] scoreWithAI called for submission ${submissionId}`);
@@ -830,6 +887,9 @@
 
                 // Update score display
                 updateScore(submissionId, maxAnswers);
+
+                // Mark this submission as AI-scored (for override detection)
+                aiScoredSubmissions.add(submissionId);
 
                 // Build and show reasoning panel
                 buildReasoningPanel(submissionId, data.reasoning || []);
@@ -926,6 +986,36 @@
                 content.style.display = 'none';
                 toggleBtn.innerHTML = '🧠 View AI Reasoning';
             }
+        }
+
+        // Check if host has overridden AI suggestions — show feedback box if so
+        function checkForAIOverride(submissionId) {
+            const feedbackDiv = document.getElementById(`ai-feedback-${submissionId}`);
+            if (!feedbackDiv) return;
+
+            // Only show if AI was used for this submission
+            if (!aiScoredSubmissions.has(submissionId)) return;
+
+            const form = document.querySelector(`#team-${submissionId} form`);
+            const matchesInput = form.querySelector(`#ai-matches-${submissionId}`);
+            if (!matchesInput || !matchesInput.value) return;
+
+            // Get AI's original matches
+            const aiMatches = new Set(matchesInput.value.split(',').filter(x => x).map(Number));
+
+            // Get current checkbox state
+            const currentMatches = new Set();
+            form.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                const num = parseInt(cb.name.replace('answer_', ''));
+                if (!isNaN(num)) currentMatches.add(num);
+            });
+
+            // Compare: are they different?
+            const isDifferent = aiMatches.size !== currentMatches.size ||
+                [...aiMatches].some(x => !currentMatches.has(x)) ||
+                [...currentMatches].some(x => !aiMatches.has(x));
+
+            feedbackDiv.style.display = isDifferent ? 'block' : 'none';
         }
     </script>
 
