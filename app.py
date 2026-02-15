@@ -55,7 +55,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
-APP_VERSION = "v1.2.1-NUCLEAR"
+APP_VERSION = "v2.0.0 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -85,7 +85,7 @@ else:
 def inject_version():
     """Make app version and cache buster available in all templates.
 
-    {{ app_version }} - Display version string (e.g. "v1.1.3-NUCLEAR")
+    {{ app_version }} - Display version string (e.g. "v2.0.0 - Fusion")
     {{ cache_bust }}  - Query param for static assets, changes every deploy
                         Usage: href="...?v={{ cache_bust }}"
     """
