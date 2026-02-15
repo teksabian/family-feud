@@ -64,7 +64,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
-APP_VERSION = "v2.0.1 - Fusion"
+APP_VERSION = "v2.0.2 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -460,11 +460,11 @@ def score_with_ai(question, survey_answers, team_answers):
         team_answers: List of strings (team's submitted answers)
 
     Returns:
-        List of survey answer numbers that match (e.g., [1, 3, 5])
+        Dict with 'matches' (list of ints) and 'reasoning' (list of dicts)
     """
     if not ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
         logger.error("[AI-SCORING] score_with_ai() called but AI not available")
-        return []
+        return {'matches': [], 'reasoning': []}
 
     # Build the prompt
     prompt = f"""You are scoring a Family Feud game. Determine which survey answers semantically match the team's submitted answers.
@@ -492,10 +492,22 @@ Matching Rules:
 - DO NOT match partial words that change meaning
 
 Respond with ONLY a JSON object in this exact format:
-{"matches": [1, 3, 5]}
+{
+  "matches": [1, 3, 5],
+  "reasoning": [
+    {"team_answer": "car", "matched_to": 1, "survey_answer": "Automobile", "why": "Car is a common synonym for automobile"},
+    {"team_answer": "food", "matched_to": null, "survey_answer": null, "why": "Too vague, no survey answer about food"}
+  ]
+}
 
-Where the numbers are the survey answer numbers that have semantic matches in the team's answers.
-If no matches, return: {"matches": []}"""
+"matches" = list of survey answer numbers that have a semantic match in the team's answers.
+"reasoning" = one entry per team answer, in the order they were submitted:
+  - "team_answer" = the team's submitted text
+  - "matched_to" = the survey answer number (integer) it matches, or null if no match
+  - "survey_answer" = the text of the matched survey answer, or null if no match
+  - "why" = one short sentence explaining the decision
+
+If no matches at all, return: {"matches": [], "reasoning": [...]}"""
 
     try:
         logger.info(f"[AI-SCORING] Calling Claude API (prompt length: {len(prompt)} chars)")
@@ -504,7 +516,7 @@ If no matches, return: {"matches": []}"""
 
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=256,
+            max_tokens=1024,
             temperature=0,
             messages=[
                 {"role": "user", "content": prompt}
@@ -514,21 +526,34 @@ If no matches, return: {"matches": []}"""
         response_text = message.content[0].text
         logger.info(f"[AI-SCORING] Claude response: {response_text}")
 
-        # Extract JSON from response (in case there's extra text)
-        json_match = re.search(r'\{[^}]*"matches"[^}]*\}', response_text)
-        if json_match:
-            response_json = json.loads(json_match.group())
+        # Parse JSON response - try full parse first, then regex fallback
+        response_json = None
+        try:
+            response_json = json.loads(response_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON object from response text
+            # Find the outermost { ... } block
+            brace_start = response_text.find('{')
+            brace_end = response_text.rfind('}')
+            if brace_start != -1 and brace_end != -1:
+                try:
+                    response_json = json.loads(response_text[brace_start:brace_end + 1])
+                except json.JSONDecodeError:
+                    pass
+
+        if response_json and 'matches' in response_json:
             matches = response_json.get('matches', [])
+            reasoning = response_json.get('reasoning', [])
 
             # Validate matches are within valid range
             max_num = max(a['number'] for a in survey_answers) if survey_answers else 0
             valid_matches = [m for m in matches if isinstance(m, int) and 1 <= m <= max_num]
 
-            logger.info(f"[AI-SCORING] Parsed {len(valid_matches)} valid matches: {valid_matches}")
-            return valid_matches
+            logger.info(f"[AI-SCORING] Parsed {len(valid_matches)} valid matches: {valid_matches}, {len(reasoning)} reasoning entries")
+            return {'matches': valid_matches, 'reasoning': reasoning}
         else:
-            logger.warning(f"[AI-SCORING] Could not find JSON in response: {response_text}")
-            return []
+            logger.warning(f"[AI-SCORING] Could not parse JSON from response: {response_text}")
+            return {'matches': [], 'reasoning': []}
 
     except Exception as e:
         logger.error(f"[AI-SCORING] Claude API call failed: {e}", exc_info=True)
@@ -1589,21 +1614,22 @@ def ai_score_submission(submission_id):
 
             if not team_answers:
                 logger.info("[AI-SCORING] No team answers to score")
-                return jsonify({'success': True, 'matches': []})
+                return jsonify({'success': True, 'matches': [], 'reasoning': []})
 
             logger.info(f"[AI-SCORING] Scoring {len(team_answers)} team answers against {len(survey_answers)} survey answers")
 
-            suggested_matches = score_with_ai(
+            ai_result = score_with_ai(
                 question=round_info['question'],
                 survey_answers=survey_answers,
                 team_answers=team_answers
             )
 
-            logger.info(f"[AI-SCORING] Result: matches={suggested_matches}")
+            logger.info(f"[AI-SCORING] Result: matches={ai_result['matches']}, reasoning_count={len(ai_result.get('reasoning', []))}")
 
             return jsonify({
                 'success': True,
-                'matches': suggested_matches
+                'matches': ai_result['matches'],
+                'reasoning': ai_result.get('reasoning', [])
             })
 
     except Exception as e:

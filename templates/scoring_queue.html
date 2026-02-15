@@ -384,6 +384,97 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
         }
+
+        /* AI Reasoning Panel */
+        .ai-reasoning {
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+
+        .ai-reasoning-toggle {
+            background: none;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .ai-reasoning-toggle:hover {
+            background: rgba(102, 126, 234, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .ai-reasoning-content {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .reasoning-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .reasoning-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .reasoning-row.match {
+            background: rgba(40, 167, 69, 0.1);
+        }
+
+        .reasoning-row.reject {
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        .reasoning-icon {
+            font-size: 1.2em;
+            flex-shrink: 0;
+            width: 24px;
+            text-align: center;
+        }
+
+        .reasoning-detail {
+            flex: 1;
+            color: #fff;
+            font-size: 0.95em;
+        }
+
+        .reasoning-team-answer {
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .reasoning-arrow {
+            color: #999;
+            margin: 0 4px;
+        }
+
+        .reasoning-survey-answer {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .reasoning-no-match {
+            color: #dc3545;
+            font-style: italic;
+        }
+
+        .reasoning-why {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85em;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -485,6 +576,15 @@
                             id="ai-btn-{{ sub.id }}">
                         🤖 Send to AI for Scoring
                     </button>
+                    <div class="ai-reasoning" id="ai-reasoning-{{ sub.id }}" style="display:none;">
+                        <button type="button" class="ai-reasoning-toggle"
+                                onclick="toggleReasoning({{ sub.id }})"
+                                id="ai-reasoning-toggle-{{ sub.id }}">
+                            🧠 View AI Reasoning
+                        </button>
+                        <div class="ai-reasoning-content" id="ai-reasoning-content-{{ sub.id }}" style="display:none;">
+                        </div>
+                    </div>
                     {% endif %}
 
                     <button type="submit" class="submit-btn">
@@ -709,6 +809,7 @@
                 }
 
                 console.log('[AI-SCORING] Suggested matches:', data.matches);
+                console.log('[AI-SCORING] Reasoning:', data.reasoning);
 
                 // Uncheck all boxes first
                 checkboxes.forEach(cb => { cb.checked = false; });
@@ -721,6 +822,9 @@
 
                 // Update score display
                 updateScore(submissionId, maxAnswers);
+
+                // Build and show reasoning panel
+                buildReasoningPanel(submissionId, data.reasoning || []);
 
                 // Show success toast
                 const count = data.matches.length;
@@ -750,6 +854,69 @@
                 button.disabled = false;
                 button.classList.remove('thinking');
                 button.innerHTML = originalText;
+            }
+        }
+
+        // Build reasoning panel from AI response
+        function buildReasoningPanel(submissionId, reasoning) {
+            const container = document.getElementById(`ai-reasoning-${submissionId}`);
+            const content = document.getElementById(`ai-reasoning-content-${submissionId}`);
+            const toggleBtn = document.getElementById(`ai-reasoning-toggle-${submissionId}`);
+
+            if (!container || !content) return;
+
+            // Clear old reasoning
+            content.innerHTML = '';
+
+            if (!reasoning || reasoning.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            // Build rows
+            reasoning.forEach(entry => {
+                const isMatch = entry.matched_to !== null && entry.matched_to !== undefined;
+                const row = document.createElement('div');
+                row.className = `reasoning-row ${isMatch ? 'match' : 'reject'}`;
+
+                const icon = isMatch ? '✅' : '❌';
+                const teamAnswer = entry.team_answer || '?';
+                const surveyText = isMatch
+                    ? `<span class="reasoning-arrow">→</span> <span class="reasoning-survey-answer">#${entry.matched_to} ${entry.survey_answer || ''}</span>`
+                    : `<span class="reasoning-arrow">→</span> <span class="reasoning-no-match">No match</span>`;
+                const why = entry.why || '';
+
+                row.innerHTML = `
+                    <span class="reasoning-icon">${icon}</span>
+                    <div class="reasoning-detail">
+                        <div><span class="reasoning-team-answer">"${teamAnswer}"</span> ${surveyText}</div>
+                        ${why ? `<div class="reasoning-why">${why}</div>` : ''}
+                    </div>
+                `;
+
+                content.appendChild(row);
+            });
+
+            // Show the reasoning container (button visible, content still hidden until toggled)
+            container.style.display = 'block';
+            // Reset toggle state
+            toggleBtn.innerHTML = '🧠 View AI Reasoning';
+            content.style.display = 'none';
+        }
+
+        // Toggle reasoning panel visibility
+        function toggleReasoning(submissionId) {
+            const content = document.getElementById(`ai-reasoning-content-${submissionId}`);
+            const toggleBtn = document.getElementById(`ai-reasoning-toggle-${submissionId}`);
+
+            if (!content || !toggleBtn) return;
+
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                toggleBtn.innerHTML = '🧠 Hide AI Reasoning';
+            } else {
+                content.style.display = 'none';
+                toggleBtn.innerHTML = '🧠 View AI Reasoning';
             }
         }
     </script>
