@@ -1638,19 +1638,8 @@ def scoring_queue():
             sub_dict['time_ago'] = time_ago(sub['submitted_at'])
             sub_dict['submitted_time'] = format_timestamp(sub['submitted_at'])
             
-            # Auto-check matches regardless of position
-            auto_checks = {}
-            for i in range(1, active_round['num_answers'] + 1):
-                correct_answer = active_round[f'answer{i}']
-                auto_checks[i] = False  # Default to unchecked
-                
-                # Search through ALL their submitted answers
-                if correct_answer:
-                    for j in range(1, active_round['num_answers'] + 1):
-                        their_answer = sub[f'answer{j}']
-                        if their_answer and similar(their_answer, correct_answer):
-                            auto_checks[i] = True  # Found a match!
-                            break  # Stop searching for this correct answer
+            # All boxes unchecked by default — host reviews manually
+            auto_checks = {i: False for i in range(1, active_round['num_answers'] + 1)}
             
             sub_dict['auto_checks'] = auto_checks
             submissions_data.append(sub_dict)
@@ -2153,17 +2142,7 @@ def edit_score(submission_id):
             # Parse "1,3,5" into set {1, 3, 5}
             checked_set = set(map(int, submission['checked_answers'].split(',')))
         else:
-            # Fallback: Figure out which answers should be checked by similarity
-            for i in range(1, round_info['num_answers'] + 1):
-                correct_answer = round_info[f'answer{i}']
-                
-                # Search through ALL their submitted answers
-                if correct_answer:
-                    for j in range(1, round_info['num_answers'] + 1):
-                        their_answer = submission[f'answer{j}']
-                        if their_answer and similar(their_answer, correct_answer):
-                            checked_set.add(i)
-                            break
+            checked_set = set()  # No auto-matching — start unchecked
         
         # Convert to dict for template
         auto_checks = {i: (i in checked_set) for i in range(1, round_info['num_answers'] + 1)}
