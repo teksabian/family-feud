@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Answers - Family Feud</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial Black', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #000;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 3px solid #ffd700;
+            text-align: center;
+        }
+
+        h1 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            font-size: 1.6em;
+        }
+
+        .round-info {
+            color: #fff;
+            font-size: 1em;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(30,60,114,0.5);
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+        }
+
+        .camera-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 25px 30px;
+            border-radius: 15px;
+            font-size: 1.4em;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 15px 0;
+            min-height: 80px;
+        }
+
+        .camera-btn:hover {
+            background: #138496;
+        }
+
+        .camera-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .camera-btn.scan-next {
+            background: #28a745;
+        }
+
+        .camera-btn.scan-next:hover {
+            background: #218838;
+        }
+
+        #photoInput {
+            display: none;
+        }
+
+        /* Processing state */
+        .processing {
+            display: none;
+            padding: 30px 0;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255,215,0,0.3);
+            border-top: 6px solid #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            color: #ffd700;
+            font-size: 1.2em;
+        }
+
+        .processing-subtext {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
+        /* Results */
+        .results {
+            display: none;
+            text-align: left;
+        }
+
+        .result-item {
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        .result-success {
+            background: rgba(40,167,69,0.3);
+            border: 2px solid #28a745;
+            color: #fff;
+        }
+
+        .result-fail {
+            background: rgba(220,53,69,0.3);
+            border: 2px solid #dc3545;
+            color: #fff;
+        }
+
+        .result-code {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .summary {
+            color: #ffd700;
+            font-size: 1.3em;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        .error-msg {
+            color: #ff6b6b;
+            font-size: 1.1em;
+            padding: 15px;
+            background: rgba(220,53,69,0.2);
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        /* Photo preview */
+        .preview-area {
+            display: none;
+            margin: 15px 0;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #ffd700;
+            text-decoration: none;
+            font-size: 1em;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .scan-count {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📷 Scan Answers</h1>
+
+            <div class="round-info">
+                <strong>Round {{ round.round_number }}:</strong> {{ round.question }}
+            </div>
+
+            <!-- Camera capture -->
+            <div id="captureSection">
+                <input type="file" id="photoInput" accept="image/*" capture="environment">
+
+                <button class="camera-btn" id="snapBtn" onclick="document.getElementById('photoInput').click()">
+                    📷 Snap Answer Sheet
+                </button>
+
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.85em;">
+                    Position page so all teams are visible
+                </p>
+            </div>
+
+            <!-- Photo preview -->
+            <div class="preview-area" id="previewArea">
+                <img id="previewImg" class="preview-img" alt="Photo preview">
+            </div>
+
+            <!-- Processing spinner -->
+            <div class="processing" id="processingSection">
+                <div class="spinner"></div>
+                <div class="processing-text">Reading answers...</div>
+                <div class="processing-subtext">Claude is reading the handwriting</div>
+            </div>
+
+            <!-- Results -->
+            <div class="results" id="resultsSection">
+                <div class="summary" id="resultsSummary"></div>
+                <div id="resultsList"></div>
+
+                <button class="camera-btn scan-next" id="scanNextBtn" onclick="resetForNextScan()">
+                    📷 Scan Next Page
+                </button>
+            </div>
+
+            <!-- Error display -->
+            <div class="error-msg" id="errorSection" style="display:none">
+                <span id="errorText"></span>
+                <br><br>
+                <button class="camera-btn" onclick="resetForNextScan()" style="padding: 15px; font-size: 1em;">
+                    Try Again
+                </button>
+            </div>
+
+            <div class="scan-count" id="scanCount"></div>
+        </div>
+
+        <a href="{{ url_for('host_dashboard') }}?v={{ cache_bust }}" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <script>
+        const ROUND_ID = {{ round.id }};
+        let totalScanned = 0;
+        let totalTeamsSubmitted = 0;
+
+        // Handle photo selection
+        document.getElementById('photoInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                document.getElementById('previewImg').src = ev.target.result;
+                document.getElementById('previewArea').style.display = 'block';
+
+                // Compress and upload
+                compressAndUpload(file);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function compressAndUpload(file) {
+            // Show processing state
+            document.getElementById('captureSection').style.display = 'none';
+            document.getElementById('processingSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+
+            const img = new Image();
+            img.onload = function() {
+                // Resize if needed (max 1600px on longest side)
+                const MAX_SIZE = 1600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_SIZE || height > MAX_SIZE) {
+                    if (width > height) {
+                        height = Math.round(height * MAX_SIZE / width);
+                        width = MAX_SIZE;
+                    } else {
+                        width = Math.round(width * MAX_SIZE / height);
+                        height = MAX_SIZE;
+                    }
+                }
+
+                // Draw to canvas and compress
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Get base64 JPEG (quality 0.8)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                // Strip the data:image/jpeg;base64, prefix
+                const base64 = dataUrl.split(',')[1];
+
+                console.log(`[PHOTO-SCAN] Image: ${img.width}x${img.height} -> ${width}x${height}, base64 size: ${base64.length}`);
+
+                uploadPhoto(base64);
+            };
+
+            img.onerror = function() {
+                showError('Could not read the photo. Please try again.');
+            };
+
+            // Read file as data URL to load into Image
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function uploadPhoto(base64) {
+            try {
+                const response = await fetch('{{ url_for("photo_scan_upload") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        image: base64,
+                        round_id: ROUND_ID
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showResults(data);
+                } else {
+                    showError(data.error || 'Something went wrong. Please try again.');
+                }
+            } catch (error) {
+                console.error('[PHOTO-SCAN] Upload failed:', error);
+                showError('Network error. Check your connection and try again.');
+            }
+        }
+
+        function showResults(data) {
+            document.getElementById('processingSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            const summary = data.summary;
+            totalScanned++;
+            totalTeamsSubmitted += summary.succeeded;
+
+            let summaryText = '';
+            if (summary.succeeded > 0 && summary.failed === 0) {
+                summaryText = `✅ ${summary.succeeded} team${summary.succeeded > 1 ? 's' : ''} submitted!`;
+            } else if (summary.succeeded > 0 && summary.failed > 0) {
+                summaryText = `✅ ${summary.succeeded} submitted, ⚠️ ${summary.failed} failed`;
+            } else {
+                summaryText = `⚠️ ${summary.failed} team${summary.failed > 1 ? 's' : ''} failed`;
+            }
+            document.getElementById('resultsSummary').textContent = summaryText;
+
+            // Build results list
+            const listEl = document.getElementById('resultsList');
+            listEl.innerHTML = '';
+
+            data.results.forEach(function(r) {
+                const div = document.createElement('div');
+                div.className = 'result-item ' + (r.success ? 'result-success' : 'result-fail');
+
+                const codeSpan = document.createElement('span');
+                codeSpan.className = 'result-code';
+                codeSpan.textContent = r.code || '??';
+
+                const textNode = document.createTextNode(
+                    r.success
+                        ? ' ' + r.team_name + ' — Added to scoring queue'
+                        : ' ' + r.team_name + ' — ' + (r.error || 'Failed')
+                );
+
+                div.appendChild(r.success ? document.createTextNode('✅ ') : document.createTextNode('❌ '));
+                div.appendChild(codeSpan);
+                div.appendChild(textNode);
+                listEl.appendChild(div);
+            });
+
+            updateScanCount();
+        }
+
+        function showError(message) {
+            document.getElementById('processingSection').style.display = 'none';
+            document.getElementById('captureSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorText').textContent = message;
+        }
+
+        function resetForNextScan() {
+            // Reset file input
+            document.getElementById('photoInput').value = '';
+
+            // Show capture, hide everything else
+            document.getElementById('captureSection').style.display = 'block';
+            document.getElementById('previewArea').style.display = 'none';
+            document.getElementById('processingSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+        }
+
+        function updateScanCount() {
+            if (totalScanned > 0) {
+                document.getElementById('scanCount').textContent =
+                    `${totalScanned} page${totalScanned > 1 ? 's' : ''} scanned — ${totalTeamsSubmitted} teams total`;
+            }
+        }
+    </script>
+    {% include '_toast.html' %}
+</body>
+</html>

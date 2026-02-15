@@ -1148,6 +1148,14 @@
                             📝 Manual Entry (Paper Submissions)
                         </button>
                     </a>
+
+                    {% if ai_scoring_available %}
+                    <a href="{{ url_for('photo_scan') }}?v={{ cache_bust }}" style="text-decoration: none;">
+                        <button type="button" class="btn-block" style="background: #17a2b8; color: white; margin-top: 10px;">
+                            📷 Scan Paper Answers (Phone Camera)
+                        </button>
+                    </a>
+                    {% endif %}
                 </div>
                 {% endif %}
                 

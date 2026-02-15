@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import base64
 import sqlite3
 import secrets
 import string
@@ -475,6 +476,131 @@ def similar(a, b):
         return True
     return False
 
+PHOTO_SCAN_PROMPT = """You are extracting handwritten answers from a Family Feud paper answer sheet.
+
+The page contains up to 4 team answer blocks arranged in a 2x2 grid. Each block has these labeled fields:
+- Team Name: (handwritten or printed)
+- Answer 1: through Answer 6: (handwritten answers to a Family Feud question)
+- Tie Breaker #: (a number, typically 0-100)
+
+There may also be a team CODE printed or written on the sheet (like "A1", "B3", "C2", etc.). Look for it near the team name area.
+
+Extract ALL team blocks visible on the page that have at least a team name filled in. Skip completely blank blocks.
+
+Rules:
+- Read handwriting as accurately as possible, even if messy
+- If a field is blank/empty, use an empty string ""
+- The tiebreaker should be an integer. If unclear or blank, use 0
+- Team names may be creative/unusual — transcribe exactly what is written
+- Answers may contain multiple words, abbreviations, or slang — transcribe as-is
+- If you see a team code (like "A1", "B3"), include it. If not visible, use ""
+- List any fields where you are NOT confident in the "low_confidence_fields" array
+
+Respond with ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "teams": [
+    {
+      "code": "A1",
+      "team_name": "The Winners",
+      "answers": ["chicken", "pizza", "broccoli", "", "", ""],
+      "tiebreaker": 42,
+      "low_confidence_fields": ["answers.2"]
+    }
+  ]
+}
+
+Always return exactly 6 entries in the answers array per team (use "" for blank ones).
+For low_confidence_fields, use: "code", "team_name", "tiebreaker", or "answers.0" through "answers.5"."""
+
+
+def extract_answers_from_photo(image_b64):
+    """
+    Use Claude Vision API to extract handwritten answers from a photo of a paper answer sheet.
+
+    Args:
+        image_b64: Base64-encoded JPEG image string (no data URI prefix)
+
+    Returns:
+        List of dicts with keys: code, team_name, answers (list of 6 strings), tiebreaker (int), low_confidence_fields (list)
+    """
+    if not ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
+        logger.error("[PHOTO-SCAN] extract_answers_from_photo() called but AI not available")
+        return []
+
+    try:
+        logger.info(f"[PHOTO-SCAN] Calling Claude Vision API (image size: {len(image_b64)} chars base64)")
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2048,
+            temperature=0,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_b64
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": PHOTO_SCAN_PROMPT
+                    }
+                ]
+            }]
+        )
+
+        response_text = message.content[0].text
+        logger.info(f"[PHOTO-SCAN] Claude Vision response: {response_text[:500]}")
+
+        # Parse JSON response - same fallback pattern as score_with_ai()
+        response_json = None
+        try:
+            response_json = json.loads(response_text)
+        except json.JSONDecodeError:
+            brace_start = response_text.find('{')
+            brace_end = response_text.rfind('}')
+            if brace_start != -1 and brace_end != -1:
+                try:
+                    response_json = json.loads(response_text[brace_start:brace_end + 1])
+                except json.JSONDecodeError:
+                    pass
+
+        if response_json and 'teams' in response_json:
+            teams = response_json['teams']
+            # Validate and normalize each team
+            for team in teams:
+                team.setdefault('code', '')
+                team.setdefault('team_name', '')
+                team.setdefault('tiebreaker', 0)
+                team.setdefault('low_confidence_fields', [])
+                # Ensure exactly 6 answers
+                answers = team.get('answers', [])
+                while len(answers) < 6:
+                    answers.append('')
+                team['answers'] = answers[:6]
+                # Ensure tiebreaker is int
+                try:
+                    team['tiebreaker'] = int(team['tiebreaker'])
+                except (ValueError, TypeError):
+                    team['tiebreaker'] = 0
+
+            logger.info(f"[PHOTO-SCAN] Extracted {len(teams)} teams from photo")
+            return teams
+        else:
+            logger.warning(f"[PHOTO-SCAN] Could not parse teams from response")
+            return []
+
+    except Exception as e:
+        logger.error(f"[PHOTO-SCAN] Claude Vision API call failed: {e}", exc_info=True)
+        raise
+
+
 def score_with_ai(question, survey_answers, team_answers):
     """
     Use Claude AI to determine semantic matches between team answers and survey answers.
@@ -740,7 +866,8 @@ def host_dashboard():
                          active_round=dict(active_round) if active_round else None,
                          unscored_count=unscored_count,
                          submission_count=submission_count,
-                         rounds_config=ROUNDS_CONFIG)
+                         rounds_config=ROUNDS_CONFIG,
+                         ai_scoring_available=AI_SCORING_ENABLED)
 
 @app.route('/host/codes-status')
 @host_required
@@ -2171,6 +2298,135 @@ def manual_entry_submit():
         # Traditional form submit (fallback)
         flash('✅ Manual entry submitted successfully!', 'success')
         return redirect(url_for('host_dashboard'))
+
+@app.route('/host/photo-scan')
+@host_required
+def photo_scan():
+    """Photo scan page — mobile camera UI for scanning paper answer sheets"""
+    logger.info("[PHOTO-SCAN] photo_scan() - loading photo scan page")
+
+    if not AI_SCORING_ENABLED:
+        flash('AI features are required for Photo Scan. Enable AI scoring in Settings.', 'error')
+        return redirect(url_for('host_dashboard'))
+
+    with db_connect() as conn:
+        active_round = conn.execute("SELECT * FROM rounds WHERE is_active = 1").fetchone()
+
+        if not active_round:
+            flash('No active round! Please activate a round first.', 'error')
+            return redirect(url_for('host_dashboard'))
+
+    return render_template('photo_scan.html',
+                         round=dict(active_round))
+
+
+@app.route('/host/photo-scan/upload', methods=['POST'])
+@host_required
+def photo_scan_upload():
+    """Receive photo, extract answers via Claude Vision, insert into submissions"""
+    logger.info("[PHOTO-SCAN] photo_scan_upload() - processing image")
+
+    if not AI_SCORING_ENABLED:
+        return jsonify({'success': False, 'error': 'AI features not available'}), 503
+
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({'success': False, 'error': 'No image provided'}), 400
+
+    image_b64 = data['image']
+    round_id = data.get('round_id')
+
+    with db_connect() as conn:
+        round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+        if not round_info:
+            return jsonify({'success': False, 'error': 'Round not found'}), 404
+        num_answers = round_info['num_answers']
+
+        # Get valid codes for matching
+        valid_codes = {row['code'].upper(): row['code'] for row in
+                       conn.execute("SELECT code FROM team_codes").fetchall()}
+
+        # Extract answers from photo
+        try:
+            teams = extract_answers_from_photo(image_b64)
+        except Exception as e:
+            logger.error(f"[PHOTO-SCAN] Extraction failed: {e}")
+            return jsonify({'success': False, 'error': 'Failed to read photo. Try again with better lighting.'}), 500
+
+        if not teams:
+            return jsonify({'success': False, 'error': 'No teams found in photo. Make sure the answer sheet is clearly visible.'}), 400
+
+        # Insert each team into submissions
+        results = []
+        for team in teams:
+            code_raw = team.get('code', '').strip()
+            team_name = team.get('team_name', '').strip()
+            tiebreaker = team.get('tiebreaker', 0)
+            answers = team.get('answers', [''] * 6)
+
+            # Match code (case-insensitive)
+            code = valid_codes.get(code_raw.upper(), '')
+
+            if not code:
+                results.append({
+                    'team_name': team_name,
+                    'code': code_raw,
+                    'success': False,
+                    'error': f'Code "{code_raw}" not found'
+                })
+                continue
+
+            if not team_name:
+                results.append({
+                    'team_name': '(blank)',
+                    'code': code,
+                    'success': False,
+                    'error': 'No team name found'
+                })
+                continue
+
+            # Mark code as used with team name
+            conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
+                        (team_name, code))
+
+            # Build and insert submission (same logic as manual_entry_submit)
+            fields = ['code', 'round_id', 'tiebreaker'] + [f'answer{i}' for i in range(1, num_answers + 1)]
+            placeholders = ', '.join(['?'] * len(fields))
+            values = [code, round_id, tiebreaker] + [answers[i] if i < len(answers) else '' for i in range(num_answers)]
+
+            try:
+                conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
+                results.append({
+                    'team_name': team_name,
+                    'code': code,
+                    'success': True
+                })
+                logger.info(f"[PHOTO-SCAN] Submitted: team='{team_name}' code={code}")
+            except sqlite3.IntegrityError:
+                results.append({
+                    'team_name': team_name,
+                    'code': code,
+                    'success': False,
+                    'error': 'Already submitted for this round'
+                })
+                logger.warning(f"[PHOTO-SCAN] Duplicate: code={code}")
+
+        conn.commit()
+
+    succeeded = sum(1 for r in results if r['success'])
+    failed = sum(1 for r in results if not r['success'])
+    logger.info(f"[PHOTO-SCAN] Done: {succeeded} succeeded, {failed} failed")
+
+    return jsonify({
+        'success': True,
+        'results': results,
+        'summary': {
+            'total': len(results),
+            'succeeded': succeeded,
+            'failed': failed
+        }
+    })
+
 
 @app.route('/host/round/<int:round_id>/edit-answer/<int:answer_num>')
 @host_required
