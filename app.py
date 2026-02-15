@@ -813,6 +813,14 @@ def host_logout():
 def host_dashboard():
     """Main host dashboard"""
     logger.info("[HOST] host_dashboard() - loading dashboard")
+
+    # Auto-redirect mobile devices to photo scan page (if AI enabled)
+    # Skip redirect if ?desktop=1 is passed (escape hatch for full dashboard on phone)
+    if AI_SCORING_ENABLED and not request.args.get('desktop'):
+        ua = request.headers.get('User-Agent', '').lower()
+        if any(m in ua for m in ['iphone', 'android', 'mobile']):
+            logger.info("[HOST] Mobile device detected — redirecting to photo scan")
+            return redirect(url_for('photo_scan'))
     with db_connect() as conn:
         codes_raw = conn.execute("""
             SELECT code, used, team_name, reconnected, last_heartbeat 
