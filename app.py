@@ -2305,6 +2305,53 @@ def manual_entry_submit():
         flash('✅ Manual entry submitted successfully!', 'success')
         return redirect(url_for('host_dashboard'))
 
+@app.route('/host/register-team')
+@host_required
+def register_team():
+    """Page to register a team (code + name) without submitting answers"""
+    logger.info("[REGISTER] register_team() - loading registration page")
+    with db_connect() as conn:
+        all_codes = conn.execute("""
+            SELECT code, team_name, used FROM team_codes
+            ORDER BY code ASC
+        """).fetchall()
+
+    return render_template('register_team.html', codes=all_codes)
+
+
+@app.route('/host/register-team/submit', methods=['POST'])
+@host_required
+def register_team_submit():
+    """Register a team code with a team name (no answer submission)"""
+    code = request.form.get('code', '').strip()
+    team_name = request.form.get('team_name', '').strip()
+    logger.info(f"[REGISTER] register_team_submit() - code={code}, team_name='{team_name}'")
+
+    if not code or not team_name:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'Please select a code and enter a team name.'}), 400
+        flash('Please fill in all required fields!', 'error')
+        return redirect(url_for('register_team'))
+
+    with db_connect() as conn:
+        # Verify code exists
+        existing = conn.execute("SELECT code FROM team_codes WHERE code = ?", (code,)).fetchone()
+        if not existing:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': 'Invalid team code.'}), 400
+            flash('Invalid team code!', 'error')
+            return redirect(url_for('register_team'))
+
+        conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?", (team_name, code))
+        conn.commit()
+        logger.info(f"[REGISTER] Team registered: '{team_name}' with code {code}")
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'team_name': team_name, 'code': code})
+    flash(f'✅ {team_name} registered with code {code}!', 'success')
+    return redirect(url_for('register_team'))
+
+
 @app.route('/host/photo-scan')
 @app.route('/host/scan')
 @host_required
@@ -2383,18 +2430,22 @@ def photo_scan_upload():
                 })
                 continue
 
-            if not team_name:
+            # Use pre-registered team name if available (host registration is authoritative)
+            existing = conn.execute("SELECT team_name, used FROM team_codes WHERE code = ?", (code,)).fetchone()
+            if existing and existing['used'] and existing['team_name']:
+                team_name = existing['team_name']
+            elif not team_name:
                 results.append({
                     'team_name': '(blank)',
                     'code': code,
                     'success': False,
-                    'error': 'No team name found'
+                    'error': 'No team name found — register this team first'
                 })
                 continue
-
-            # Mark code as used with team name
-            conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
-                        (team_name, code))
+            else:
+                # New team from OCR — register them
+                conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
+                            (team_name, code))
 
             # Build and insert submission (same logic as manual_entry_submit)
             fields = ['code', 'round_id', 'tiebreaker'] + [f'answer{i}' for i in range(1, num_answers + 1)]

@@ -1143,6 +1143,12 @@
                         </button>
                     </a>
                     
+                    <a href="{{ url_for('register_team') }}?v={{ cache_bust }}" style="text-decoration: none;">
+                        <button type="button" class="btn-block" style="background: #17a2b8; color: white; margin-top: 10px;">
+                            📋 Register Team (Code + Name)
+                        </button>
+                    </a>
+
                     <a href="{{ url_for('manual_entry') }}?v={{ cache_bust }}" style="text-decoration: none;">
                         <button type="button" class="btn-block" style="background: #6c757d; color: white; margin-top: 10px;">
                             📝 Manual Entry (Paper Submissions)
@@ -1150,11 +1156,9 @@
                     </a>
 
                     {% if ai_scoring_available %}
-                    <a href="{{ url_for('photo_scan') }}?v={{ cache_bust }}" style="text-decoration: none;">
-                        <button type="button" class="btn-block" style="background: #17a2b8; color: white; margin-top: 10px;">
-                            📷 Scan Paper Answers (Phone Camera)
-                        </button>
-                    </a>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 0.85em; margin-top: 15px;">
+                        📷 To scan paper answers with your phone, open <strong style="color: #ffd700;">/host/scan</strong> on a mobile device
+                    </p>
                     {% endif %}
                 </div>
                 {% endif %}
