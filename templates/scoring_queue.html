@@ -348,6 +348,42 @@
         }
         
         /* Pulse animation removed */
+
+        /* AI Scoring Button */
+        .ai-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            padding: 18px;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            border: 2px solid #5a67d8;
+            transition: all 0.3s;
+        }
+
+        .ai-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .ai-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ai-btn.thinking {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #000;
+            border-color: #ffd700;
+            animation: ai-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes ai-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
@@ -443,6 +479,14 @@
                         <div class="score">0</div>
                     </div>
                     
+                    {% if ai_scoring_enabled %}
+                    <button type="button" class="ai-btn"
+                            onclick="scoreWithAI({{ sub.id }}, {{ round.num_answers }})"
+                            id="ai-btn-{{ sub.id }}">
+                        🤖 Send to AI for Scoring
+                    </button>
+                    {% endif %}
+
                     <button type="submit" class="submit-btn">
                         ✅ SUBMIT SCORE FOR THIS TEAM
                     </button>
@@ -626,6 +670,90 @@
         updateUnscoredCount();
     </script>
     
+    <script>
+        // AI Scoring Function
+        async function scoreWithAI(submissionId, maxAnswers) {
+            console.log(`[AI-SCORING] scoreWithAI called for submission ${submissionId}`);
+
+            const button = document.getElementById(`ai-btn-${submissionId}`);
+            const form = document.querySelector(`#team-${submissionId} form`);
+            const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+
+            // Save original state
+            const originalText = button.innerHTML;
+
+            // Set loading state
+            button.disabled = true;
+            button.classList.add('thinking');
+            button.innerHTML = '🤖 AI is thinking...';
+
+            try {
+                const response = await fetch(`/host/ai-score/${submissionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error('[AI-SCORING] API error:', data.error);
+                    if (typeof showToast === 'function') {
+                        showToast(`⚠️ ${data.error}`, 'error', 6000);
+                    }
+                    button.disabled = false;
+                    button.classList.remove('thinking');
+                    button.innerHTML = originalText;
+                    return;
+                }
+
+                console.log('[AI-SCORING] Suggested matches:', data.matches);
+
+                // Uncheck all boxes first
+                checkboxes.forEach(cb => { cb.checked = false; });
+
+                // Check the ones AI suggests
+                data.matches.forEach(answerNum => {
+                    const cb = form.querySelector(`input[name="answer_${answerNum}"]`);
+                    if (cb) cb.checked = true;
+                });
+
+                // Update score display
+                updateScore(submissionId, maxAnswers);
+
+                // Show success toast
+                const count = data.matches.length;
+                if (typeof showToast === 'function') {
+                    showToast(`🤖 AI suggests ${count} match${count !== 1 ? 'es' : ''}. Review and submit.`, 'success', 5000);
+                }
+
+                // Show success state on button
+                button.classList.remove('thinking');
+                button.innerHTML = '✅ AI Scored - Review Above';
+                button.style.background = '#28a745';
+                button.style.borderColor = '#28a745';
+
+                // Restore button after 3 seconds
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                    button.style.borderColor = '';
+                }, 3000);
+
+            } catch (error) {
+                console.error('[AI-SCORING] Network error:', error);
+                if (typeof showToast === 'function') {
+                    showToast('⚠️ Network error during AI scoring. Try again.', 'error', 5000);
+                }
+                button.disabled = false;
+                button.classList.remove('thinking');
+                button.innerHTML = originalText;
+            }
+        }
+    </script>
+
     <script>
         // Toggle Answers Visibility
         function toggleAnswers() {

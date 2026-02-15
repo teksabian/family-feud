@@ -440,6 +440,35 @@
             </div>
         </div>
         
+        <!-- AI Scoring Toggle (only visible when ENABLE_AI_SCORING env var is set) -->
+        {% if ai_scoring_available %}
+        <div class="card">
+            <h2>🤖 AI Scoring</h2>
+
+            <form method="POST" action="{{ url_for('toggle_setting') }}?v={{ cache_bust }}">
+                <input type="hidden" name="setting_key" value="ai_scoring_enabled">
+                <div class="toggle-container">
+                    <span class="toggle-label">🤖 AI-Assisted Scoring</span>
+                    <div class="toggle-switch {% if ai_scoring_enabled %}active{% endif %}"
+                         onclick="this.closest('form').submit()">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="help-text">
+                {% if ai_scoring_enabled %}
+                    🟢 <strong>AI Scoring is ON</strong> - "Send to AI" button appears on the scoring queue
+                {% else %}
+                    🔴 <strong>AI Scoring is OFF</strong> - AI button hidden from scoring queue
+                {% endif %}
+            </div>
+            <div class="help-text" style="margin-top: 5px;">
+                AI suggests semantic matches but you always have final say. ~$0.01 per scoring.
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Broadcast Message -->
         <div class="card">
             <h2>📢 Broadcast Message</h2>

@@ -1,4 +1,6 @@
 import os
+import json
+import re
 import sqlite3
 import secrets
 import string
@@ -8,6 +10,13 @@ from datetime import datetime
 from functools import wraps
 from flask import Flask, request, render_template, redirect, url_for, jsonify, session, flash
 from difflib import SequenceMatcher
+
+# AI Scoring - optional dependency
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 # ===== LOGGING CONFIGURATION =====
 # For Render.com (cloud), logs go to stdout
@@ -55,7 +64,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
-APP_VERSION = "v2.0.0 - Fusion"
+APP_VERSION = "v2.0.1 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -80,6 +89,19 @@ if not os.environ.get('HOST_PASSWORD'):
     logger.warning("No HOST_PASSWORD env var set — using default development password")
 else:
     logger.info("Host password protection enabled (custom password set)")
+
+# AI Scoring configuration
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+ENABLE_AI_SCORING = os.environ.get('ENABLE_AI_SCORING', 'false').lower() == 'true'
+AI_SCORING_ENABLED = ENABLE_AI_SCORING and ANTHROPIC_AVAILABLE and bool(ANTHROPIC_API_KEY)
+if AI_SCORING_ENABLED:
+    logger.info("AI Scoring: ENABLED (env var ON, SDK installed, API key configured)")
+elif ENABLE_AI_SCORING and not ANTHROPIC_AVAILABLE:
+    logger.warning("AI Scoring: DISABLED - anthropic SDK not installed")
+elif ENABLE_AI_SCORING and not ANTHROPIC_API_KEY:
+    logger.warning("AI Scoring: DISABLED - ANTHROPIC_API_KEY not set")
+else:
+    logger.info("AI Scoring: DISABLED (ENABLE_AI_SCORING not set)")
 
 @app.context_processor
 def inject_version():
@@ -427,6 +449,90 @@ def similar(a, b):
         logger.debug(f"[SCORING] similar() fuzzy match: '{a}' ~ '{b}' (ratio={ratio:.3f})")
         return True
     return False
+
+def score_with_ai(question, survey_answers, team_answers):
+    """
+    Use Claude AI to determine semantic matches between team answers and survey answers.
+
+    Args:
+        question: The Family Feud question text
+        survey_answers: List of dicts with 'number', 'text', 'points' keys
+        team_answers: List of strings (team's submitted answers)
+
+    Returns:
+        List of survey answer numbers that match (e.g., [1, 3, 5])
+    """
+    if not ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
+        logger.error("[AI-SCORING] score_with_ai() called but AI not available")
+        return []
+
+    # Build the prompt
+    prompt = f"""You are scoring a Family Feud game. Determine which survey answers semantically match the team's submitted answers.
+
+Question: "{question}"
+
+Survey Answers (the correct answers from the survey):
+"""
+    for ans in survey_answers:
+        prompt += f"{ans['number']}. {ans['text']} ({ans['points']} points)\n"
+
+    prompt += "\nTeam's Submitted Answers:\n"
+    for ans in team_answers:
+        prompt += f"- {ans}\n"
+
+    prompt += """
+Matching Rules:
+- Exact matches count (e.g., "car" matches "car")
+- Synonyms count (e.g., "automobile" matches "car")
+- Common abbreviations count (e.g., "bike" matches "bicycle")
+- Specific types count (e.g., "minivan" matches "van")
+- Plurals/singulars are the same (e.g., "dogs" matches "dog")
+- Minor misspellings count if intent is clear
+- DO NOT match if the meaning is different
+- DO NOT match partial words that change meaning
+
+Respond with ONLY a JSON object in this exact format:
+{"matches": [1, 3, 5]}
+
+Where the numbers are the survey answer numbers that have semantic matches in the team's answers.
+If no matches, return: {"matches": []}"""
+
+    try:
+        logger.info(f"[AI-SCORING] Calling Claude API (prompt length: {len(prompt)} chars)")
+
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=256,
+            temperature=0,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        response_text = message.content[0].text
+        logger.info(f"[AI-SCORING] Claude response: {response_text}")
+
+        # Extract JSON from response (in case there's extra text)
+        json_match = re.search(r'\{[^}]*"matches"[^}]*\}', response_text)
+        if json_match:
+            response_json = json.loads(json_match.group())
+            matches = response_json.get('matches', [])
+
+            # Validate matches are within valid range
+            max_num = max(a['number'] for a in survey_answers) if survey_answers else 0
+            valid_matches = [m for m in matches if isinstance(m, int) and 1 <= m <= max_num]
+
+            logger.info(f"[AI-SCORING] Parsed {len(valid_matches)} valid matches: {valid_matches}")
+            return valid_matches
+        else:
+            logger.warning(f"[AI-SCORING] Could not find JSON in response: {response_text}")
+            return []
+
+    except Exception as e:
+        logger.error(f"[AI-SCORING] Claude API call failed: {e}", exc_info=True)
+        raise
 
 def time_ago(timestamp_str):
     """Convert timestamp to 'X minutes ago' format"""
@@ -1319,9 +1425,11 @@ def scoring_queue():
             sub_dict['auto_checks'] = auto_checks
             submissions_data.append(sub_dict)
     logger.info(f"[SCORING] scoring_queue() - {len(submissions_data)} unscored submissions for round {active_round['round_number']}")
+    ai_enabled = AI_SCORING_ENABLED and get_setting('ai_scoring_enabled', 'true') == 'true'
     return render_template('scoring_queue.html',
                          round=dict(active_round),
-                         submissions=submissions_data)
+                         submissions=submissions_data,
+                         ai_scoring_enabled=ai_enabled)
 
 @app.route('/host/check-active-round')
 @host_required
@@ -1428,6 +1536,79 @@ def score_team(submission_id):
         # Traditional form submit (fallback)
         flash(f'{team_name} scored {score} points!', 'success')
         return redirect(url_for('scoring_queue'))
+
+@app.route('/host/ai-score/<int:submission_id>', methods=['POST'])
+@host_required
+def ai_score_submission(submission_id):
+    """Use Claude AI to suggest scoring for a submission"""
+    logger.info(f"[AI-SCORING] ai_score_submission() - submission_id={submission_id}")
+
+    if not AI_SCORING_ENABLED:
+        logger.error("[AI-SCORING] AI scoring not enabled at server level")
+        return jsonify({'error': 'AI scoring not enabled'}), 500
+
+    if get_setting('ai_scoring_enabled', 'true') != 'true':
+        logger.error("[AI-SCORING] AI scoring disabled in settings")
+        return jsonify({'error': 'AI scoring is turned off in settings'}), 500
+
+    try:
+        with db_connect() as conn:
+            submission = conn.execute(
+                "SELECT * FROM submissions WHERE id = ?", (submission_id,)
+            ).fetchone()
+
+            if not submission:
+                logger.error(f"[AI-SCORING] Submission {submission_id} not found")
+                return jsonify({'error': 'Submission not found'}), 404
+
+            round_info = conn.execute(
+                "SELECT * FROM rounds WHERE id = ?", (submission['round_id'],)
+            ).fetchone()
+
+            if not round_info:
+                logger.error(f"[AI-SCORING] Round {submission['round_id']} not found")
+                return jsonify({'error': 'Round not found'}), 404
+
+            # Build survey answers list
+            survey_answers = []
+            for i in range(1, round_info['num_answers'] + 1):
+                answer = round_info[f'answer{i}']
+                if answer:
+                    survey_answers.append({
+                        'number': i,
+                        'text': answer,
+                        'points': round_info['num_answers'] - i + 1
+                    })
+
+            # Build team answers list (only non-blank)
+            team_answers = []
+            for i in range(1, round_info['num_answers'] + 1):
+                answer = submission[f'answer{i}']
+                if answer and answer.strip():
+                    team_answers.append(answer.strip())
+
+            if not team_answers:
+                logger.info("[AI-SCORING] No team answers to score")
+                return jsonify({'success': True, 'matches': []})
+
+            logger.info(f"[AI-SCORING] Scoring {len(team_answers)} team answers against {len(survey_answers)} survey answers")
+
+            suggested_matches = score_with_ai(
+                question=round_info['question'],
+                survey_answers=survey_answers,
+                team_answers=team_answers
+            )
+
+            logger.info(f"[AI-SCORING] Result: matches={suggested_matches}")
+
+            return jsonify({
+                'success': True,
+                'matches': suggested_matches
+            })
+
+    except Exception as e:
+        logger.error(f"[AI-SCORING] Error: {e}", exc_info=True)
+        return jsonify({'error': f'AI scoring failed: {str(e)}'}), 500
 
 @app.route('/host/undo-score/<int:submission_id>', methods=['POST'])
 @host_required
@@ -2003,12 +2184,15 @@ def settings():
     allow_team_registration = get_setting('allow_team_registration', 'true') == 'true'
     system_paused = get_setting('system_paused', 'false') == 'true'
     broadcast_message = get_setting('broadcast_message', '')
-    
-    return render_template('settings.html', 
+    ai_scoring_enabled = get_setting('ai_scoring_enabled', 'true') == 'true'
+
+    return render_template('settings.html',
                          qr_base_url=current_qr_url,
                          allow_team_registration=allow_team_registration,
                          system_paused=system_paused,
-                         broadcast_message=broadcast_message)
+                         broadcast_message=broadcast_message,
+                         ai_scoring_available=AI_SCORING_ENABLED,
+                         ai_scoring_enabled=ai_scoring_enabled)
 
 @app.route('/host/toggle-setting', methods=['POST'])
 @host_required
@@ -2016,13 +2200,13 @@ def toggle_setting():
     """Toggle a boolean setting"""
     setting_key = request.form.get('setting_key')
 
-    if setting_key in ['allow_team_registration', 'system_paused']:
-        current_value = get_setting(setting_key, 'false')
+    if setting_key in ['allow_team_registration', 'system_paused', 'ai_scoring_enabled']:
+        current_value = get_setting(setting_key, 'true' if setting_key == 'ai_scoring_enabled' else 'false')
         new_value = 'false' if current_value == 'true' else 'true'
         logger.info(f"[SETTINGS] toggle_setting() - {setting_key}: '{current_value}' -> '{new_value}'")
-        
+
         set_setting(setting_key, new_value, '')
-        
+
         # User-friendly messages
         if setting_key == 'allow_team_registration':
             if new_value == 'true':
@@ -2036,6 +2220,11 @@ def toggle_setting():
                 flash('⏸️ System PAUSED - Team registration also disabled', 'success')
             else:
                 flash('▶️ System RESUMED - Remember to re-enable registration if needed', 'success')
+        elif setting_key == 'ai_scoring_enabled':
+            if new_value == 'true':
+                flash('🤖 AI Scoring enabled - AI button will appear on scoring queue', 'success')
+            else:
+                flash('🤖 AI Scoring disabled - AI button hidden from scoring queue', 'success')
     
     return redirect(url_for('settings'))
 
