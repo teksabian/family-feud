@@ -2306,6 +2306,7 @@ def manual_entry_submit():
         return redirect(url_for('host_dashboard'))
 
 @app.route('/host/photo-scan')
+@app.route('/host/scan')
 @host_required
 def photo_scan():
     """Photo scan page — mobile camera UI for scanning paper answer sheets"""
