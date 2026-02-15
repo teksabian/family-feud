@@ -206,8 +206,9 @@ def db_connect():
 
 def generate_team_code():
     """Generate 4-letter code like BAJK (no numbers for easier mobile typing)"""
-    # Only uppercase letters, excluding confusing ones (I, O look like 1, 0)
-    chars = string.ascii_uppercase.replace('I', '').replace('O', '')
+    # Only letters that are unambiguous in handwriting AND OCR
+    # Removed: C/G (similar), D/O (similar), I/L (identical), O/Q (similar), U/V (similar)
+    chars = 'ABEFHJKMNPRSTWXYZ'
     code = ''.join(secrets.choice(chars) for _ in range(4))
     logger.debug(f"[CODES] Generated team code: {code}")
     return code
@@ -2418,12 +2419,26 @@ def photo_scan_upload():
             tiebreaker = team.get('tiebreaker', 0)
             answers = team.get('answers', [''] * 6)
 
-            # Match code (case-insensitive)
+            # Match code: exact first, fuzzy fallback
             code = valid_codes.get(code_raw.upper(), '')
+
+            if not code and code_raw:
+                # Fuzzy fallback — find closest code (3 of 4 letters must match)
+                best_ratio = 0
+                best_code = ''
+                code_upper = code_raw.upper()
+                for valid_upper, valid_original in valid_codes.items():
+                    ratio = SequenceMatcher(None, code_upper, valid_upper).ratio()
+                    if ratio > best_ratio and ratio >= 0.75:
+                        best_ratio = ratio
+                        best_code = valid_original
+                if best_code:
+                    code = best_code
+                    logger.info(f"[PHOTO-SCAN] Fuzzy code match: '{code_raw}' → {code} (ratio={best_ratio:.2f})")
 
             if not code:
                 results.append({
-                    'team_name': team_name,
+                    'team_name': team_name or '(blank)',
                     'code': code_raw,
                     'success': False,
                     'error': f'Code "{code_raw}" not found'
