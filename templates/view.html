@@ -532,42 +532,31 @@
                 </div>
             </div>
 
-            <!-- STATE: scored -->
+            <!-- STATE: scored (players only see their submitted answers, no scoring info) -->
             <div data-state="scored" {% if state != 'scored' %}style="display: none;"{% endif %}>
-                <div class="score-total">
-                    <div class="score-number" id="score-number">{% if submission and submission.get('score') is not none %}{{ submission['score'] }}{% else %}0{% endif %}</div>
-                    <div class="score-label">Points</div>
-                </div>
+                <p style="color: #28a745; font-size: 1em; text-align: center; margin: 0 0 10px 0;">Answers Submitted</p>
 
-                <div id="answers-container">
-                    {% if state == 'scored' and submission and round_info %}
-                    {% set checked = (submission.get('checked_answers') or '').split(',') %}
-                    {% for i in range(1, (num_answers or 0) + 1) %}
-                    {% set is_correct = i|string in checked %}
-                    <div class="answer-result">
-                        <span class="answer-num {{ 'correct' if is_correct else 'incorrect' }}">{{ i }}</span>
-                        <div class="answer-text-col">
-                            <div class="answer-text {{ 'correct' if is_correct }}">{{ submission['answer' ~ i] or '(blank)' }}</div>
-                            {% if not is_correct and round_info.get('answer' ~ i) %}
-                            <div class="correct-answer-label">Survey: {{ round_info['answer' ~ i] }}</div>
-                            {% endif %}
+                <div class="answer-preview" id="scored-answers-preview">
+                    <h3>Your Answers</h3>
+                    <div class="answer-preview-list" id="scored-answers-list">
+                        {% if state == 'scored' and submission %}
+                        {% for i in range(1, (num_answers or 0) + 1) %}
+                        <div class="answer-preview-item">
+                            <span class="answer-preview-num">{{ i }}</span>
+                            <span class="answer-preview-text">{{ submission['answer' ~ i] or '(blank)' }}</span>
                         </div>
-                        <span class="answer-check">{{ '✅' if is_correct else '❌' }}</span>
-                        {% if is_correct %}
-                        <span class="answer-points">+{{ num_answers - i + 1 }}</span>
-                        {% else %}
-                        <span class="answer-points zero">+0</span>
+                        {% endfor %}
+                        {% if submission.get('tiebreaker') %}
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <span class="tiebreaker-label">Tiebreaker:</span>
+                            <span class="tiebreaker-value">{{ submission['tiebreaker'] }}</span>
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </div>
-                    {% endfor %}
-                    {% if submission.get('tiebreaker') %}
-                    <div class="tiebreaker-display">
-                        <span class="tiebreaker-label">Tiebreaker:</span>
-                        <span class="tiebreaker-value">{{ submission['tiebreaker'] }}</span>
-                    </div>
-                    {% endif %}
-                    {% endif %}
                 </div>
+
+                <p style="color: #888; font-size: 0.85em; text-align: center; margin-top: 10px;">Scores are being tallied by the host</p>
             </div>
 
             <!-- Winner Interstitial (shown via JS on round transition) -->
@@ -653,62 +642,30 @@
         }
 
         function renderScoredAnswers(data) {
-            var checkedSet = {};
-            if (data.checked_answers) {
-                data.checked_answers.split(',').forEach(function(n) {
-                    checkedSet[parseInt(n)] = true;
-                });
-            }
-
-            var container = document.getElementById('answers-container');
+            // Players only see their submitted answers - no scoring info
+            var container = document.getElementById('scored-answers-list');
             container.innerHTML = '';
 
             for (var i = 1; i <= data.num_answers; i++) {
-                var isCorrect = checkedSet[i] === true;
-                var points = isCorrect ? (data.num_answers - i + 1) : 0;
-                var teamAnswer = data.answers['answer' + i] || '(blank)';
-                var correctAnswer = data.correct_answers ? (data.correct_answers['answer' + i] || '') : '';
+                var item = document.createElement('div');
+                item.className = 'answer-preview-item';
 
-                var row = document.createElement('div');
-                row.className = 'answer-result';
+                var num = document.createElement('span');
+                num.className = 'answer-preview-num';
+                num.textContent = i;
 
-                var numEl = document.createElement('span');
-                numEl.className = 'answer-num ' + (isCorrect ? 'correct' : 'incorrect');
-                numEl.textContent = i;
+                var text = document.createElement('span');
+                text.className = 'answer-preview-text';
+                text.textContent = data.answers['answer' + i] || '(blank)';
 
-                var textCol = document.createElement('div');
-                textCol.className = 'answer-text-col';
-
-                var ansText = document.createElement('div');
-                ansText.className = 'answer-text' + (isCorrect ? ' correct' : '');
-                ansText.textContent = teamAnswer;
-                textCol.appendChild(ansText);
-
-                if (!isCorrect && correctAnswer) {
-                    var correctLabel = document.createElement('div');
-                    correctLabel.className = 'correct-answer-label';
-                    correctLabel.textContent = 'Survey: ' + correctAnswer;
-                    textCol.appendChild(correctLabel);
-                }
-
-                var check = document.createElement('span');
-                check.className = 'answer-check';
-                check.textContent = isCorrect ? '\u2705' : '\u274C';
-
-                var pts = document.createElement('span');
-                pts.className = 'answer-points' + (isCorrect ? '' : ' zero');
-                pts.textContent = '+' + points;
-
-                row.appendChild(numEl);
-                row.appendChild(textCol);
-                row.appendChild(check);
-                row.appendChild(pts);
-                container.appendChild(row);
+                item.appendChild(num);
+                item.appendChild(text);
+                container.appendChild(item);
             }
 
             if (data.tiebreaker) {
                 var tb = document.createElement('div');
-                tb.className = 'tiebreaker-display';
+                tb.style.cssText = 'margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);';
 
                 var tbLabel = document.createElement('span');
                 tbLabel.className = 'tiebreaker-label';
@@ -722,8 +679,6 @@
                 tb.appendChild(tbVal);
                 container.appendChild(tb);
             }
-
-            document.getElementById('score-number').textContent = data.score;
         }
 
         function updateHeader(data) {
@@ -819,12 +774,6 @@
                         renderUnscoredAnswers(data);
                     }
                     showState(data.state);
-                } else if (data.state === 'scored' && currentState === 'scored') {
-                    // Score may have been updated (re-scored)
-                    var currentScore = document.getElementById('score-number').textContent;
-                    if (String(data.score) !== currentScore) {
-                        renderScoredAnswers(data);
-                    }
                 }
 
             } catch (error) {
