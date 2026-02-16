@@ -67,7 +67,7 @@ else:
     logger.info("="*50)
 
 app = Flask(__name__)
-APP_VERSION = "v2.0.4 - Fusion"
+APP_VERSION = "v2.0.5 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 

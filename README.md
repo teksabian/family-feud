@@ -14,12 +14,12 @@ A Flask-based Family Feud game designed for pub trivia nights. Teams join via QR
 
 ## Version
 
-**V3.9.9.2** - Production Ready
-- All critical bugs fixed
-- Security patch applied
-- UI improvements
-- Mobile enhancements
-- 100% test pass rate
+**v2.0.5 - Fusion** - Production Ready
+- AI-assisted scoring with Claude API + training feedback loop
+- Photo scan: snap paper answer sheets from phone camera
+- Mobile-first team experience with auto-save and real-time updates
+- Nuclear reset architecture (fresh state every restart)
+- All critical security patches applied
 
 ## Local Development
 
@@ -219,6 +219,15 @@ python test_mobile_edge_cases.py
 - ✅ Session security (Flask signed cookies)
 - ✅ HTTPS on Render (free SSL)
 
+## Documentation
+
+- [Changelog](docs/CHANGELOG.md) — Full version history
+- [AI Scoring](docs/features/AI_SCORING.md) — AI-assisted scoring setup and usage
+- [Mobile Experience](docs/features/MOBILE_EXPERIENCE.md) — Mobile optimizations
+- [Nuclear Reset](docs/architecture/NUCLEAR_RESET.md) — Server startup reset behavior
+- [Render Deployment](docs/deployment/RENDER_DEPLOYMENT.md) — Cloud deployment guide
+- [Security Patches](docs/security/SECURITY_PATCHES.md) — Security audit history
+
 ## Support
 
 For issues or questions:
@@ -236,4 +245,4 @@ Built for weekly pub trivia nights at local venues.
 
 ---
 
-**V3.9.9.2** - Battle-tested and production ready! 🍻🎯
+**v2.0.5 - Fusion** - Battle-tested and production ready! 🍻🎯
