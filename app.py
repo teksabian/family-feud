@@ -3370,8 +3370,7 @@ def team_view(code):
             round_num=active_round['round_number'],
             question=active_round['question'],
             num_answers=active_round['num_answers'],
-            submission=dict(submission),
-            round_info=dict(active_round))
+            submission=dict(submission))
 
 @app.route('/play')
 @team_session_valid
@@ -3614,18 +3613,13 @@ def api_view_status(code):
             }
             result['tiebreaker'] = submission['tiebreaker']
         else:
+            # Players only see their submitted answers - no scoring data
             result['state'] = 'scored'
-            result['score'] = submission['score']
             result['answers'] = {
                 f'answer{i}': submission[f'answer{i}']
                 for i in range(1, active_round['num_answers'] + 1)
             }
             result['tiebreaker'] = submission['tiebreaker']
-            result['checked_answers'] = submission['checked_answers'] or ''
-            result['correct_answers'] = {
-                f'answer{i}': active_round[f'answer{i}']
-                for i in range(1, active_round['num_answers'] + 1)
-            }
 
         prev_round = conn.execute("""
             SELECT r.round_number, r.winner_code, tc.team_name, s.score
