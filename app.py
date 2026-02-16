@@ -1110,7 +1110,7 @@ def print_codes():
 @app.route('/host/print-codes-landscape')
 @host_required
 def print_codes_landscape():
-    """Generate landscape HTML page with codes for printing - 12 codes per page"""
+    """Generate landscape HTML page with QR codes linking to /view/<code> status pages"""
     logger.info("[CODES] print_codes_landscape() - generating landscape print page")
     with db_connect() as conn:
         # Get first 24 codes (2 pages of 12)
@@ -1140,7 +1140,7 @@ def print_codes_landscape():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Team Codes - Landscape</title>
+        <title>Status QR Codes</title>
         <style>
             @page {{
                 size: 11in 8.5in landscape;
@@ -1233,9 +1233,9 @@ def print_codes_landscape():
             code = code_row['code']
             
             if code:  # Only show card if code exists
-                # QR code points to /join page only (team must enter code manually)
-                qr_url = f"{qr_base_url}/join"
-                
+                # QR code points directly to /view/<code> status page
+                qr_url = f"{qr_base_url}/view/{code}"
+
                 html += f"""
             <div class="card">
                 <div class="code-header">
@@ -1246,8 +1246,8 @@ def print_codes_landscape():
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={qr_url}" alt="QR Code">
                 </div>
                 <div class="instruction">
-                    Scan the Code to Join<br>
-                    and Enter the Code.
+                    Scan to View<br>
+                    Your Answers
                 </div>
             </div>
             """
