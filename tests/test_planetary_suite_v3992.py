@@ -4,7 +4,7 @@ FAMILY FEUD V1 - PLANETARY TEST SUITE v3.9.9.2
 ===============================================
 Comprehensive automated testing for all features across Rounds 1-5
 
-Run with: python test_planetary_suite_v3992.py
+Run with: python tests/test_planetary_suite_v3992.py
 
 Author: Claude (Anthropic)
 Date: February 11, 2026
@@ -19,8 +19,8 @@ import json
 import time
 from datetime import datetime
 
-# Add parent directory to path to import app
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path to import app
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 print("="*70)
 print("🧪 FAMILY FEUD - PLANETARY TEST SUITE v3.9.9.2")
