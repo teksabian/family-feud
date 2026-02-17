@@ -472,6 +472,17 @@
     <div class="container">
         <div class="card">
 
+            <!-- STATE: code_not_found -->
+            <div data-state="code_not_found" {% if state != 'code_not_found' %}style="display: none;"{% endif %}>
+                <div class="waiting">
+                    <div class="loading"></div>
+                    <h2>Hang Tight!</h2>
+                    <p>Code <strong>{{ code }}</strong> wasn't found yet.</p>
+                    <p>The host may not have set up this code yet, or the server may have restarted.</p>
+                    <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page will check automatically</p>
+                </div>
+            </div>
+
             <!-- STATE: waiting_for_registration -->
             <div data-state="waiting_for_registration" {% if state != 'waiting_for_registration' %}style="display: none;"{% endif %}>
                 <div class="waiting">
@@ -718,6 +729,15 @@
                 }
 
                 if (data.sleep_mode) return;
+
+                // Code was just found/created - reload to get full page state
+                if (currentState === 'code_not_found' && data.state !== 'code_not_found') {
+                    window.location.reload();
+                    return;
+                }
+
+                // Still code not found - keep polling
+                if (data.state === 'code_not_found') return;
 
                 // Team just got registered - reload to get real team name
                 if (currentState === 'waiting_for_registration' && data.state !== 'waiting_for_registration') {
