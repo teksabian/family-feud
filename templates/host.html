@@ -1070,6 +1070,19 @@
                     </a>
                 </div>
                 
+                <!-- Register Team - always visible -->
+                <div class="card" style="border-color: #17a2b8;">
+                    <h2 style="color: #17a2b8;">📋 Register Team</h2>
+                    <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px; font-size: 0.95em;">
+                        Register teams with codes before starting the game
+                    </p>
+                    <a href="{{ url_for('register_team') }}?v={{ cache_bust }}" style="text-decoration: none;">
+                        <button type="button" class="btn-block" style="background: #17a2b8; color: white;">
+                            REGISTER TEAM
+                        </button>
+                    </a>
+                </div>
+
                 <!-- Create Rounds - Combined (only if no rounds exist) -->
                 {% if not rounds %}
                 <div class="card" style="border-color: #ffd700;">
@@ -1143,12 +1156,6 @@
                         </button>
                     </a>
                     
-                    <a href="{{ url_for('register_team') }}?v={{ cache_bust }}" style="text-decoration: none;">
-                        <button type="button" class="btn-block" style="background: #17a2b8; color: white; margin-top: 10px;">
-                            REGISTER TEAM
-                        </button>
-                    </a>
-
                     <a href="{{ url_for('manual_entry') }}?v={{ cache_bust }}" style="text-decoration: none;">
                         <button type="button" class="btn-block" style="background: #6c757d; color: white; margin-top: 10px;">
                             MANUAL ENTRY
