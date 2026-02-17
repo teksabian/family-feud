@@ -2,28 +2,29 @@
 # Render.com Blueprint — Family Feud
 # =============================================================================
 #
-# IMPORTANT: Preview Environments are DISABLED to prevent cross-service
-# deployment issues. We have two manually-created Render services:
-#
+# Services:
 #   1. PRODUCTION (v1) → pubfeud.gamenightguild.net    (deploys from: v1 branch)
 #   2. DEV (v2)        → ff-v2-dev.gamenightguild.net  (deploys from: main branch)
 #
-# To test major changes safely:
-#   1. Create a feature branch off main
-#   2. Open a PR to main — test at ff-v2-dev.gamenightguild.net after merge
-#   3. Production (v1) is untouched since it deploys from the v1 branch only
+# Preview Environments (Review Apps):
+#   - Enabled: each PR automatically gets a temporary preview instance
+#   - Preview URL: auto-assigned by Render (e.g., family-feud-pr-N.onrender.com)
+#   - QR codes on previews use the preview's own URL (not production)
+#   - Previews auto-expire after 3 days of inactivity
+#   - Production and Dev services are NOT affected by previews
 #
-# DO NOT enable preview environments — it triggers deploys on BOTH services.
 # =============================================================================
 
 previews:
-  generation: "off"
+  generation: automatic
+  expireAfterDays: 3
 
 services:
   - type: web
     name: family-feud
     runtime: python
     plan: free
+    previewPlan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
@@ -34,3 +35,9 @@ services:
       # HOST_PASSWORD is set in Render dashboard (not in code)
       - key: RENDER
         value: "true"
+      - key: IS_PREVIEW
+        value: "false"
+        previewValue: "true"
+      - key: QR_BASE_URL
+        value: ""
+        previewValue: ""
