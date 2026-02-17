@@ -95,23 +95,26 @@
 
         .back-link {
             display: block;
+            width: 100%;
+            background: #ffd700;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
             text-align: center;
-            margin-top: 20px;
-            color: #ffd700;
             text-decoration: none;
-            font-size: 1.1em;
+            margin-top: 10px;
         }
 
         .back-link:hover {
-            text-decoration: underline;
+            background: #e6c200;
         }
     </style>
 </head>
 <body>
-    <div style="position: absolute; top: 20px; left: 20px; z-index: 100;">
-        <a href="{{ url_for('host_dashboard') }}?v={{ cache_bust }}" class="back-link">← Back to Dashboard</a>
-    </div>
-
     <div class="container">
         <div class="card">
             <h1>📋 Register Team</h1>
@@ -139,6 +142,7 @@
                 </div>
 
                 <button type="submit">✅ Register Team</button>
+                <a href="{{ url_for('host_dashboard') }}?v={{ cache_bust }}" class="back-link">← Back to Dashboard</a>
             </form>
         </div>
     </div>
