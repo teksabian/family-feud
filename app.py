@@ -3551,6 +3551,7 @@ def check_round_status():
 @app.route('/view/<code>')
 def team_view(code):
     """View-only page for manually-entered teams. Auth is the code in the URL."""
+    code = code.strip().upper()
     logger.debug(f"[VIEW] team_view() - code={code}")
 
     with db_connect() as conn:
@@ -3561,7 +3562,12 @@ def team_view(code):
 
         if not team:
             logger.warning(f"[VIEW] team_view() - code not found: {code}")
-            return render_template('game_over.html', reason='invalid_code'), 404
+            return render_template('view.html',
+                team_name=f"Code: {code}",
+                code=code,
+                state='code_not_found',
+                round_num=0,
+                question='')
 
         if not team['used'] or not team['team_name']:
             logger.debug(f"[VIEW] team_view() - code exists but not yet registered: {code}")
@@ -3792,6 +3798,7 @@ def api_broadcast_message():
 @app.route('/api/view-status/<code>')
 def api_view_status(code):
     """API endpoint for view-only page polling. Returns round + scoring state."""
+    code = code.strip().upper()
     logger.debug(f"[API] api_view_status() - code={code}")
 
     server_sleep = get_setting('server_sleep', 'false')
@@ -3805,7 +3812,7 @@ def api_view_status(code):
         ).fetchone()
 
         if not team:
-            return jsonify({'error': 'Invalid code'}), 404
+            return jsonify({'state': 'code_not_found', 'has_active_round': False})
 
         if not team['used'] or not team['team_name']:
             return jsonify({'state': 'waiting_for_registration', 'has_active_round': False})

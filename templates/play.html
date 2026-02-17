@@ -1140,6 +1140,7 @@
         }
 
         // AJAX polling - check for next round every 5 seconds
+        let currentRoundNumber = {{ round_num }};
         let winnerShown = false;
 
         function showWinnerInterstitial(teamName, score, roundNum) {
@@ -1162,7 +1163,7 @@
         }
 
         async function checkForNextRound() {
-            console.log('[POLL] Checking for next round (submissions_closed view)');
+            console.log('[POLL] Checking for next round (submissions_closed view, currentRound:', currentRoundNumber, ')');
             if (winnerShown) return; // Stop polling during winner display
 
             try {
@@ -1184,9 +1185,16 @@
                     return; // Stop polling
                 }
 
-                if (data.has_active_round) {
-                    console.log('[POLL] Active round detected - prev_winner:', data.prev_winner_team);
-                    // New round detected - show winner interstitial then reload
+                // No active round - round was deactivated, reload to show waiting screen
+                if (!data.has_active_round) {
+                    console.log('[POLL] No active round - reloading to waiting screen');
+                    window.location.reload();
+                    return;
+                }
+
+                // Different round is now active - new round started
+                if (data.round_number !== currentRoundNumber) {
+                    console.log('[POLL] Round changed from', currentRoundNumber, 'to', data.round_number, '- prev_winner:', data.prev_winner_team);
                     if (data.prev_winner_team) {
                         winnerShown = true;
                         showWinnerInterstitial(data.prev_winner_team, data.prev_winner_score, data.prev_round_number);
@@ -1195,6 +1203,7 @@
                         window.location.reload();
                     }
                 }
+                // Same round still active (just closed) - keep waiting
             } catch (error) {
                 console.warn('[POLL] Polling error:', error);
             }
