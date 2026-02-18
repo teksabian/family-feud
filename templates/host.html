@@ -899,7 +899,7 @@
                         {% endif %}
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-top: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-top: 20px;">
                         <a href="{{ url_for('print_codes') }}?v={{ cache_bust }}" target="_blank">
                             <button type="button" class="btn-block">
                                 🖨️ Portrait
@@ -910,9 +910,14 @@
                                 📱 Status QR
                             </button>
                         </a>
+                        <a href="{{ url_for('print_answer_sheets') }}?v={{ cache_bust }}" target="_blank">
+                            <button type="button" class="btn-block" style="background: #28a745;">
+                                📝 Answer Sheets
+                            </button>
+                        </a>
                         <form method="POST" action="{{ url_for('generate_codes') }}?v={{ cache_bust }}" style="margin: 0;">
                             <button type="submit" class="btn-generate-small">
-                                + 25 More
+                                + Reload
                             </button>
                         </form>
                     </div>

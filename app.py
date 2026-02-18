@@ -400,6 +400,31 @@ def generate_team_code():
     logger.debug(f"[CODES] Generated team code: {code}")
     return code
 
+def load_fixed_codes():
+    """Load the fixed team codes from codes.json"""
+    codes_file = os.path.join(os.path.dirname(__file__), 'codes.json')
+    with open(codes_file, 'r') as f:
+        codes = json.load(f)
+    return codes
+
+def ensure_fixed_codes():
+    """Insert fixed codes from codes.json into the database if they don't exist.
+    Also removes any codes NOT in the fixed list (leftover from old random generation).
+    """
+    codes = load_fixed_codes()
+    with db_connect() as conn:
+        # Remove codes not in the fixed list
+        placeholders = ','.join(['?'] * len(codes))
+        conn.execute(f"DELETE FROM team_codes WHERE code NOT IN ({placeholders})", codes)
+        # Insert fixed codes if not already present
+        for code in codes:
+            try:
+                conn.execute("INSERT INTO team_codes (code, used) VALUES (?, 0)", (code,))
+            except sqlite3.IntegrityError:
+                pass  # Already exists
+        conn.commit()
+    logger.info(f"[CODES] {len(codes)} fixed codes loaded from codes.json")
+
 def init_db():
     with db_connect() as conn:
         conn.execute("""
@@ -611,6 +636,7 @@ def nuke_all_data():
 
 init_db()
 nuke_all_data()  # NUKE EVERYTHING on every server start
+ensure_fixed_codes()  # Load fixed codes from codes.json
 
 # ============= SETTINGS HELPERS =============
 
@@ -1139,22 +1165,11 @@ def codes_status():
 @app.route('/host/generate-codes', methods=['POST'])
 @host_required
 def generate_codes():
-    """Generate 30 team codes"""
-    count = 30
-    logger.info(f"[CODES] generate_codes() - requesting {count} new codes")
-    with db_connect() as conn:
-        generated = []
-        for _ in range(count):
-            for attempt in range(100):
-                code = generate_team_code()
-                try:
-                    conn.execute("INSERT INTO team_codes (code, used) VALUES (?, 0)", (code,))
-                    conn.commit()
-                    generated.append(code)
-                    break
-                except sqlite3.IntegrityError:
-                    continue
-    logger.info(f"[CODES] generate_codes() - {len(generated)} codes created")
+    """Reload fixed team codes from codes.json"""
+    logger.info("[CODES] generate_codes() - reloading fixed codes from codes.json")
+    ensure_fixed_codes()
+    codes = load_fixed_codes()
+    logger.info(f"[CODES] generate_codes() - {len(codes)} fixed codes loaded")
     return f"""
     <!DOCTYPE html>
     <html>
@@ -1194,7 +1209,7 @@ def generate_codes():
     <body>
         <div class="box">
             <h1>✅ Success!</h1>
-            <p style="font-size: 1.5em;">{len(generated)} team codes generated!</p>
+            <p style="font-size: 1.5em;">{len(codes)} fixed team codes loaded!</p>
             <button onclick="window.location.href='/host'">Back to Dashboard</button>
         </div>
     </body>
@@ -1468,9 +1483,17 @@ def print_codes_landscape():
     
     return html
 
+@app.route('/host/print-answer-sheets')
+@host_required
+def print_answer_sheets():
+    """Generate printable answer sheets with pre-printed codes (60 pages)"""
+    logger.info("[CODES] print_answer_sheets() - generating 60-page printable document")
+    codes = load_fixed_codes()
+    return render_template('print_answer_sheets.html', codes=codes)
+
 def parse_pptx(filepath):
     """Parse PowerPoint file and extract questions/answers
-    
+
     IMPROVED VERSION - Handles text boxes with answer/count pairs
     Correctly distinguishes rank indicators (1,2,3) from answer counts (10,20,43)
     """
@@ -2662,22 +2685,29 @@ def photo_scan_upload():
                 })
                 continue
 
-            # Use pre-registered team name if available (host registration is authoritative)
+            # Answer sheet is authoritative for team names
             existing = conn.execute("SELECT team_name, used FROM team_codes WHERE code = ?", (code,)).fetchone()
-            if existing and existing['used'] and existing['team_name']:
-                team_name = existing['team_name']
-            elif not team_name:
+            old_name = existing['team_name'] if existing else None
+
+            if team_name:
+                # Sheet has a name — use it (first registration OR rename)
+                if old_name and old_name != team_name:
+                    logger.info(f"[PHOTO-SCAN] Team name changed: code={code} '{old_name}' -> '{team_name}'")
+                conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
+                            (team_name, code))
+            elif old_name:
+                # No name on sheet but code already registered — keep existing name
+                team_name = old_name
+                logger.info(f"[PHOTO-SCAN] No name on sheet for code={code}, keeping existing: '{team_name}'")
+            else:
+                # No name on sheet AND code not registered — cannot proceed
                 results.append({
                     'team_name': '(blank)',
                     'code': code,
                     'success': False,
-                    'error': 'No team name found — register this team first'
+                    'error': 'No team name on sheet — write a team name on the answer sheet'
                 })
                 continue
-            else:
-                # New team from OCR — register them
-                conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
-                            (team_name, code))
 
             # Build and insert submission (same logic as manual_entry_submit)
             fields = ['code', 'round_id', 'tiebreaker'] + [f'answer{i}' for i in range(1, num_answers + 1)]
@@ -2686,11 +2716,14 @@ def photo_scan_upload():
 
             try:
                 conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
-                results.append({
+                result_entry = {
                     'team_name': team_name,
                     'code': code,
                     'success': True
-                })
+                }
+                if old_name and old_name != team_name:
+                    result_entry['name_changed_from'] = old_name
+                results.append(result_entry)
                 logger.info(f"[PHOTO-SCAN] Submitted: team='{team_name}' code={code}")
             except sqlite3.IntegrityError:
                 results.append({
