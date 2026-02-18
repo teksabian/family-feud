@@ -63,7 +63,7 @@
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(3, 1fr);
             gap: 0;
-            min-height: 7.5in;
+            height: 7.5in;
             page-break-after: always;
         }
 
@@ -87,18 +87,14 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             padding: 3px 10px;
-            border-radius: 3px;
+            border: 2px solid #000;
             margin-bottom: 2px;
         }
 
-        .card-header.play {
-            background: #ffd700;
-            color: #000;
-        }
-
+        .card-header.play,
         .card-header.view {
-            background: #17a2b8;
-            color: #fff;
+            background: #fff;
+            color: #000;
         }
 
         .code-line {
@@ -110,7 +106,7 @@
 
         .code-number {
             font-size: 11px;
-            color: #888;
+            color: #555;
         }
 
         .qr {
@@ -125,7 +121,7 @@
         .instruction {
             font-size: 11px;
             line-height: 1.3;
-            color: #333;
+            color: #000;
             margin-top: 2px;
         }
 
@@ -134,10 +130,6 @@
         }
 
         @media print {
-            body {
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
-            }
             .print-bar {
                 display: none !important;
             }
