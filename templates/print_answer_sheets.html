@@ -178,7 +178,7 @@
     <div class="print-bar no-print">
         <button onclick="window.print()">🖨️ Print Answer Sheets</button>
         <button onclick="window.location.href='/host'">← Back to Dashboard</button>
-        <span style="margin-left: 20px;">{{ codes|length }} codes × 2 pages = {{ codes|length * 2 }} pages</span>
+        <span style="margin-left: 20px;">{{ group_label }} — {{ codes|length }} codes × 2 pages = {{ codes|length * 2 }} pages</span>
     </div>
 
     {% for code in codes %}

@@ -64,7 +64,7 @@ logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logger.info(f"Log level: {logging.getLevelName(log_level)} (set LOG_LEVEL=DEBUG for verbose output)")
 
 app = Flask(__name__)
-APP_VERSION = "v2.0.5 - Fusion"
+APP_VERSION = "v2.1.0 - Fusion"
 # Use environment variable for secret key in production, generate random for local dev
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
@@ -1078,9 +1078,9 @@ def host_dashboard():
     logger.debug("[HOST] host_dashboard() - loading dashboard")
     with db_connect() as conn:
         codes_raw = conn.execute("""
-            SELECT code, used, team_name, reconnected, last_heartbeat 
-            FROM team_codes 
-            ORDER BY id DESC
+            SELECT code, used, team_name, reconnected, last_heartbeat
+            FROM team_codes
+            ORDER BY id ASC
         """).fetchall()
         
         # Process codes to add active status
@@ -1139,9 +1139,9 @@ def codes_status():
     logger.debug("[CODES] codes_status() called")
     with db_connect() as conn:
         codes = conn.execute("""
-            SELECT code, used, team_name 
-            FROM team_codes 
-            ORDER BY id DESC
+            SELECT code, used, team_name
+            FROM team_codes
+            ORDER BY id ASC
         """).fetchall()
         
         codes_data = []
@@ -1486,10 +1486,19 @@ def print_codes_landscape():
 @app.route('/host/print-answer-sheets')
 @host_required
 def print_answer_sheets():
-    """Generate printable answer sheets with pre-printed codes (60 pages)"""
-    logger.info("[CODES] print_answer_sheets() - generating 60-page printable document")
-    codes = load_fixed_codes()
-    return render_template('print_answer_sheets.html', codes=codes)
+    """Generate printable answer sheets with pre-printed codes.
+    Accepts ?group=1 (codes 1-30) or ?group=2 (codes 31-60).
+    """
+    all_codes = load_fixed_codes()
+    group = request.args.get('group', '1')
+    if group == '2':
+        codes = all_codes[30:60]
+        group_label = 'Group 2 (31-60)'
+    else:
+        codes = all_codes[0:30]
+        group_label = 'Group 1 (1-30)'
+    logger.info(f"[CODES] print_answer_sheets() - generating {group_label} ({len(codes)} codes)")
+    return render_template('print_answer_sheets.html', codes=codes, group_label=group_label)
 
 def parse_pptx(filepath):
     """Parse PowerPoint file and extract questions/answers
