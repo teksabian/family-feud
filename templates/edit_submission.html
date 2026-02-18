@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Submission - Family Feud</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial Black', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .card {
+            background: #000;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 3px solid #e67e22;
+        }
+
+        h1 {
+            color: #e67e22;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .team-info {
+            color: #fff;
+            font-size: 1.1em;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(230,126,34,0.2);
+            border-radius: 8px;
+            border: 1px solid #e67e22;
+        }
+
+        .team-info strong {
+            color: #e67e22;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #e67e22;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e67e22;
+            border-radius: 8px;
+            font-size: 1.2em;
+            background: rgba(255,255,255,0.95);
+        }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(230,126,34,0.5);
+            background: #fff;
+        }
+
+        .blank-hint {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8em;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-save {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #218838;
+        }
+
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>&#9998; Edit Submission Answers</h1>
+
+            <div class="team-info">
+                <strong>Team:</strong> {{ submission.team_name }}<br>
+                <strong>Code:</strong> {{ submission.code }}<br>
+                <strong>Round {{ round.round_number }}:</strong> "{{ round.question }}"
+            </div>
+
+            <form method="POST" action="{{ url_for('update_submission', submission_id=submission.id) }}">
+                {% for i in range(1, round.num_answers + 1) %}
+                <div class="form-group">
+                    <label for="answer{{ i }}">Answer {{ i }}:</label>
+                    <input type="text"
+                           name="answer{{ i }}"
+                           id="answer{{ i }}"
+                           value="{{ submission['answer' ~ i] or '' }}"
+                           placeholder="Leave blank if unknown"
+                           {% if i == 1 %}autofocus{% endif %}>
+                    {% if not submission['answer' ~ i] %}
+                    <div class="blank-hint">Currently blank - fill in if you can read the handwriting</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                <div class="form-group">
+                    <label for="tiebreaker">Tiebreaker Guess (0-100):</label>
+                    <input type="number"
+                           name="tiebreaker"
+                           id="tiebreaker"
+                           value="{{ submission.tiebreaker or 0 }}"
+                           min="0"
+                           max="100">
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-cancel" onclick="window.location.href='{{ url_for('scoring_queue') }}'">Cancel</button>
+                    <button type="submit" class="btn-save">&#128190; Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% include '_toast.html' %}
+</body>
+</html>
