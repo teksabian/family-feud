@@ -1507,7 +1507,18 @@ def print_answer_sheets():
         codes = all_codes[0:30]
         group_label = 'Group 1 (1-30)'
     logger.info(f"[CODES] print_answer_sheets() - generating {group_label} ({len(codes)} codes)")
-    return render_template('print_answer_sheets.html', codes=codes, group_label=group_label, rounds_config=ROUNDS_CONFIG)
+
+    # Get QR base URL for join links on answer sheets
+    qr_url_from_env = os.environ.get('QR_BASE_URL')
+    if qr_url_from_env:
+        default_url = qr_url_from_env
+    elif os.environ.get('RENDER'):
+        default_url = os.environ.get('RENDER_EXTERNAL_URL', 'https://pubfeud.gamenightguild.net')
+    else:
+        default_url = 'http://localhost:5000'
+    qr_base_url = get_setting('qr_base_url', default_url)
+
+    return render_template('print_answer_sheets.html', codes=codes, group_label=group_label, rounds_config=ROUNDS_CONFIG, qr_base_url=qr_base_url)
 
 def parse_pptx(filepath):
     """Parse PowerPoint file and extract questions/answers
