@@ -168,7 +168,24 @@
             background: #0056b3;
             transform: translateY(-2px);
         }
-        
+
+        .btn-edit-submission {
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-edit-submission:hover {
+            background: #d35400;
+            transform: translateY(-2px);
+        }
+
         .team-name {
             font-size: 2em;
             color: #ffd700;
@@ -531,6 +548,10 @@
                         <div class="timestamp">Submitted: {{ sub.submitted_time }}</div>
                     </div>
                     <div class="team-header-right">
+                        <button type="button" class="btn-edit-submission"
+                                onclick="window.location.href='{{ url_for('edit_submission', submission_id=sub.id) }}'">
+                            &#9998; Edit
+                        </button>
                         <button type="button" class="btn-view-answer" id="viewBtn-{{ sub.id }}" onclick="toggleTeamAnswers('{{ sub.id }}')">
                             👁️ View Answer
                         </button>
@@ -792,6 +813,27 @@
             const button = document.getElementById(`ai-btn-${submissionId}`);
             const form = document.querySelector(`#team-${submissionId} form`);
             const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+
+            // Check for blank answers before sending to AI
+            const answerSpans = document.querySelectorAll(`#team-${submissionId} .ans-text`);
+            let blankCount = 0;
+            answerSpans.forEach(span => {
+                if (span.classList.contains('ans-blank')) {
+                    blankCount++;
+                }
+            });
+
+            if (blankCount > 0) {
+                const proceed = confirm(
+                    `Warning: ${blankCount} answer${blankCount > 1 ? 's are' : ' is'} blank for this team.\n\n` +
+                    `AI will only score the filled-in answers. Blank answers will be skipped.\n\n` +
+                    `Click OK to proceed with AI scoring, or Cancel to edit the answers first.`
+                );
+                if (!proceed) {
+                    console.log(`[AI-SCORING] User cancelled AI scoring due to ${blankCount} blank answer(s)`);
+                    return;
+                }
+            }
 
             // Save original state
             const originalText = button.innerHTML;

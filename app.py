@@ -2265,6 +2265,76 @@ def update_score(submission_id):
     logger.info(f"[SCORING] update_score() - old_score={previous_score}, new_score={score}, checked={checked_answers_str}, tiebreaker={tiebreaker}")
     return redirect(url_for('scored_teams'))
 
+@app.route('/host/edit-submission/<int:submission_id>')
+@host_required
+def edit_submission(submission_id):
+    """Edit a team's submitted answers (answer1-6 + tiebreaker) before scoring"""
+    logger.info(f"[SCORING] edit_submission() - loading edit form for submission_id={submission_id}")
+    with db_connect() as conn:
+        submission = conn.execute("""
+            SELECT s.*, tc.team_name
+            FROM submissions s
+            JOIN team_codes tc ON s.code = tc.code
+            WHERE s.id = ?
+        """, (submission_id,)).fetchone()
+
+        if not submission:
+            flash('Submission not found!', 'error')
+            return redirect(url_for('scoring_queue'))
+
+        round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (submission['round_id'],)).fetchone()
+
+        if not round_info:
+            flash('Round not found!', 'error')
+            return redirect(url_for('scoring_queue'))
+
+    return render_template('edit_submission.html',
+                         round=dict(round_info),
+                         submission=dict(submission))
+
+@app.route('/host/update-submission/<int:submission_id>', methods=['POST'])
+@host_required
+def update_submission(submission_id):
+    """Save edited team answers (answer1-6 + tiebreaker)"""
+    logger.info(f"[SCORING] update_submission() - submission_id={submission_id}")
+
+    with db_connect() as conn:
+        submission = conn.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
+
+        if not submission:
+            flash('Submission not found!', 'error')
+            return redirect(url_for('scoring_queue'))
+
+        round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (submission['round_id'],)).fetchone()
+        num_answers = round_info['num_answers']
+
+        # Collect edited answers
+        updates = []
+        values = []
+        for i in range(1, num_answers + 1):
+            answer_val = request.form.get(f'answer{i}', '').strip()
+            updates.append(f'answer{i} = ?')
+            values.append(answer_val)
+
+        # Collect edited tiebreaker
+        tiebreaker = request.form.get('tiebreaker', type=int)
+        if tiebreaker is None or tiebreaker < 0 or tiebreaker > 100:
+            tiebreaker = 0
+        updates.append('tiebreaker = ?')
+        values.append(tiebreaker)
+
+        values.append(submission_id)
+
+        conn.execute(
+            f"UPDATE submissions SET {', '.join(updates)} WHERE id = ?",
+            values
+        )
+        conn.commit()
+
+    logger.info(f"[SCORING] update_submission() - answers updated for submission_id={submission_id}")
+    flash('Submission answers updated!', 'success')
+    return redirect(url_for('scoring_queue'))
+
 @app.route('/host/revert-score/<int:submission_id>')
 @host_required
 def revert_score(submission_id):
