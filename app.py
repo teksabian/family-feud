@@ -2462,20 +2462,17 @@ def photo_scan_upload():
 
             if team_name:
                 # Sheet has a name — use it (first registration OR rename)
-                if old_name and old_name != team_name:
-                    logger.info(f"[PHOTO-SCAN] Team name changed: code={code} '{old_name}' -> '{team_name}'")
-                conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
-                            (team_name, code))
+                pending_name_update = team_name
             elif old_name:
                 # No name on sheet but code already registered — keep existing name
                 team_name = old_name
+                pending_name_update = None
                 logger.info(f"[PHOTO-SCAN] No name on sheet for code={code}, keeping existing: '{team_name}'")
             else:
                 # No name on sheet AND code not registered — assign placeholder
                 suffix = ''.join(secrets.choice(string.digits) for _ in range(4))
                 team_name = f"NO_NAME_{suffix}"
-                conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
-                            (team_name, code))
+                pending_name_update = team_name
                 logger.info(f"[PHOTO-SCAN] No name on sheet for unregistered code={code}, assigned: '{team_name}'")
 
             # Build and insert submission (same logic as manual_entry_submit)
@@ -2485,6 +2482,13 @@ def photo_scan_upload():
 
             try:
                 conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
+                # Only update team name after submission succeeds to avoid
+                # corrupting the canonical name on duplicate/failed inserts
+                if pending_name_update:
+                    if old_name and old_name != pending_name_update:
+                        logger.info(f"[PHOTO-SCAN] Team name changed: code={code} '{old_name}' -> '{pending_name_update}'")
+                    conn.execute("UPDATE team_codes SET used = 1, team_name = ? WHERE code = ?",
+                                (pending_name_update, code))
                 result_entry = {
                     'team_name': team_name,
                     'code': code,
@@ -2496,7 +2500,7 @@ def photo_scan_upload():
                 logger.info(f"[PHOTO-SCAN] Submitted: team='{team_name}' code={code}")
             except sqlite3.IntegrityError:
                 results.append({
-                    'team_name': team_name,
+                    'team_name': old_name or team_name,
                     'code': code,
                     'success': False,
                     'error': 'Already submitted for this round'
