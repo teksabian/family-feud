@@ -1047,8 +1047,12 @@
                 content.appendChild(row);
             });
 
-            // Show reasoning container and content (auto-expanded)
-            container.style.display = 'block';
+            // Show reasoning container only if answers are currently visible
+            // Check the team's their-answers div — if hidden (globally or per-team), keep reasoning hidden too
+            const teamCard = container.closest('.team-card');
+            const theirAnswers = teamCard ? teamCard.querySelector('.their-answers') : null;
+            const answersVisible = theirAnswers && theirAnswers.style.display !== 'none';
+            container.style.display = answersVisible ? 'block' : 'none';
             content.style.display = 'block';
         }
 
@@ -1256,20 +1260,28 @@
             const correctAnswersDiv = document.querySelector('.correct-answers');
             const theirAnswersDivs = document.querySelectorAll('.their-answers');
             const scoringCheckboxesDivs = document.querySelectorAll('.scoring-checkboxes');
+            const aiReasoningDivs = document.querySelectorAll('.ai-reasoning');
             const btn = document.getElementById('toggleAnswersBtn');
-            
+
             if (!btn) return;
-            
+
             // Check current state
             const isHidden = correctAnswersDiv && correctAnswersDiv.style.display === 'none';
-            
+
             if (isHidden) {
                 // Show all answers
                 if (correctAnswersDiv) correctAnswersDiv.style.display = 'block';
                 theirAnswersDivs.forEach(div => div.style.display = 'block');
                 scoringCheckboxesDivs.forEach(div => div.style.display = 'block');
+                // Show AI reasoning panels that have content
+                aiReasoningDivs.forEach(div => {
+                    const content = div.querySelector('.ai-reasoning-content');
+                    if (content && content.innerHTML.trim()) {
+                        div.style.display = 'block';
+                    }
+                });
                 btn.textContent = '🙈 HIDE ANSWERS';
-                
+
                 // Also update all per-team buttons
                 document.querySelectorAll('[id^="viewBtn-"]').forEach(teamBtn => {
                     teamBtn.textContent = '🙈 Hide Answer';
@@ -1279,8 +1291,9 @@
                 if (correctAnswersDiv) correctAnswersDiv.style.display = 'none';
                 theirAnswersDivs.forEach(div => div.style.display = 'none');
                 scoringCheckboxesDivs.forEach(div => div.style.display = 'none');
+                aiReasoningDivs.forEach(div => div.style.display = 'none');
                 btn.textContent = '👁️ SHOW ANSWERS';
-                
+
                 // Also update all per-team buttons
                 document.querySelectorAll('[id^="viewBtn-"]').forEach(teamBtn => {
                     teamBtn.textContent = '👁️ View Answer';
@@ -1293,12 +1306,14 @@
             const correctAnswersDiv = document.querySelector('.correct-answers');
             const theirAnswersDivs = document.querySelectorAll('.their-answers');
             const scoringCheckboxesDivs = document.querySelectorAll('.scoring-checkboxes');
-            
+            const aiReasoningDivs = document.querySelectorAll('.ai-reasoning');
+
             if (correctAnswersDiv) {
                 correctAnswersDiv.style.display = 'none';
             }
             theirAnswersDivs.forEach(div => div.style.display = 'none');
             scoringCheckboxesDivs.forEach(div => div.style.display = 'none');
+            aiReasoningDivs.forEach(div => div.style.display = 'none');
         });
         
         // Toggle answers for a single team
@@ -1306,17 +1321,26 @@
             const teamCard = document.getElementById('team-' + teamId);
             const theirAnswers = teamCard.querySelector('.their-answers');
             const scoringCheckboxes = teamCard.querySelector('.scoring-checkboxes');
+            const aiReasoning = teamCard.querySelector('.ai-reasoning');
             const btn = document.getElementById('viewBtn-' + teamId);
-            
+
             if (theirAnswers.style.display === 'none') {
                 // Show answers
                 theirAnswers.style.display = 'block';
                 scoringCheckboxes.style.display = 'block';
+                // Show AI reasoning if it has content
+                if (aiReasoning) {
+                    const content = aiReasoning.querySelector('.ai-reasoning-content');
+                    if (content && content.innerHTML.trim()) {
+                        aiReasoning.style.display = 'block';
+                    }
+                }
                 btn.textContent = '🙈 Hide Answer';
             } else {
                 // Hide answers
                 theirAnswers.style.display = 'none';
                 scoringCheckboxes.style.display = 'none';
+                if (aiReasoning) aiReasoning.style.display = 'none';
                 btn.textContent = '👁️ View Answer';
             }
         }
