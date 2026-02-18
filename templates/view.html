@@ -513,7 +513,6 @@
                 <div class="winner-round-label" id="winner-round-label"></div>
                 <div class="winner-heading">WINNER</div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-score"><span id="winner-score"></span> Points</div>
                 <div class="winner-next">Next round starting...</div>
                 <div class="winner-countdown-bar"><div class="winner-countdown-fill"></div></div>
             </div>
@@ -550,7 +549,6 @@
         function showWinnerInterstitial(teamName, score, roundNum) {
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
-            document.getElementById('winner-score').textContent = score;
 
             document.querySelectorAll('[data-state]').forEach(function(el) {
                 el.style.display = 'none';
