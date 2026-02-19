@@ -130,6 +130,12 @@ elif ENABLE_AI_SCORING and not ANTHROPIC_API_KEY:
 else:
     logger.info("AI Scoring: DISABLED (ENABLE_AI_SCORING not set)")
 
+# Initialize Anthropic client once for connection pooling
+anthropic_client = None
+if AI_SCORING_ENABLED:
+    anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    logger.info("Anthropic client initialized (connection pooling enabled)")
+
 # AI Model selection - which Claude model to use
 AI_MODEL_DEFAULT = os.environ.get('AI_MODEL', 'claude-sonnet-4-20250514')
 logger.info(f"AI Model default: {AI_MODEL_DEFAULT}")
@@ -838,7 +844,7 @@ def extract_answers_from_photo(image_b64):
         current_model = get_current_ai_model()
         logger.info(f"[PHOTO-SCAN] Calling Claude Vision API (model: {current_model}, image size: {len(image_b64)} chars base64)")
 
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic_client
 
         api_kwargs = build_claude_api_kwargs(max_tokens_default=2048)
         logger.info(f"[PHOTO-SCAN] Extended thinking: {'ON' if 'thinking' in api_kwargs else 'OFF'}")
@@ -1002,7 +1008,7 @@ If no matches at all, return: {"matches": [], "reasoning": [...]}"""
         current_model = get_current_ai_model()
         logger.debug(f"[AI-SCORING] Calling Claude API (model: {current_model}, prompt length: {len(prompt)} chars)")
 
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic_client
 
         api_kwargs = build_claude_api_kwargs(max_tokens_default=1024)
         logger.debug(f"[AI-SCORING] Extended thinking: {'ON' if 'thinking' in api_kwargs else 'OFF'}")
