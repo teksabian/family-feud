@@ -205,24 +205,39 @@
             vertical-align: middle;
         }
 
-        .code-row {
+        .team-row {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: flex-end;
+            margin-bottom: 10px;
         }
 
-        .code-row .form-group {
+        .team-row .form-group {
+            margin-bottom: 0;
+        }
+
+        .team-row .form-group.code-group {
+            flex: 0 0 auto;
+            min-width: 100px;
+        }
+
+        .team-row .form-group.name-group {
             flex: 1;
+        }
+
+        .team-row .form-label {
+            font-size: 0.7em;
+            margin-bottom: 2px;
         }
 
         .code-select {
             width: 100%;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 8px 6px;
+            border-radius: 6px;
             border: 2px solid #444;
             background: #1a1a2e;
             color: #fff;
-            font-size: 1.05em;
+            font-size: 0.85em;
             font-family: 'Arial', sans-serif;
         }
 
@@ -236,23 +251,22 @@
             background: rgba(255,193,7,0.1);
         }
 
-        .answers-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+        .team-row .form-input {
+            padding: 8px;
+            font-size: 0.85em;
         }
 
-        .answers-grid .form-group {
-            margin-bottom: 4px;
+        .answers-list .form-group {
+            margin-bottom: 8px;
         }
 
-        .answers-grid .form-label {
-            font-size: 0.75em;
+        .answers-list .form-label {
+            font-size: 0.8em;
         }
 
-        .answers-grid .form-input {
-            padding: 10px;
-            font-size: 0.95em;
+        .answers-list .form-input {
+            padding: 14px 12px;
+            font-size: 1.1em;
         }
 
         .divider {
@@ -264,10 +278,14 @@
         .btn-row {
             display: flex;
             gap: 10px;
-            margin-top: 10px;
+            margin-top: 12px;
         }
 
-        .btn-row .camera-btn {
+        .btn-row .submit-btn {
+            flex: 2;
+        }
+
+        .btn-row .retake-btn {
             flex: 1;
         }
 
@@ -396,36 +414,34 @@
 
                 <hr class="divider">
 
-                <!-- Team Code -->
-                <div class="code-row">
-                    <div class="form-group" style="flex: 1;">
+                <!-- Code + Team Name on one compact row -->
+                <div class="team-row">
+                    <div class="form-group code-group">
                         <label class="form-label">
-                            Team Code
+                            Code
                             <span class="confidence-badge" id="codeBadge" style="display:none">CHECK</span>
                         </label>
                         <select class="code-select" id="reviewCode">
-                            <option value="">-- Select code --</option>
+                            <option value="">--</option>
                             {% for c in valid_codes %}
                             <option value="{{ c.code }}">{{ c.code }}{% if c.team_name %} ({{ c.team_name }}){% endif %}</option>
                             {% endfor %}
                         </select>
-                        <div class="code-warning" id="codeWarning" style="display:none"></div>
+                    </div>
+                    <div class="form-group name-group">
+                        <label class="form-label">
+                            Team Name
+                            <span class="confidence-badge" id="teamNameBadge" style="display:none">CHECK</span>
+                        </label>
+                        <input type="text" class="form-input" id="reviewTeamName" placeholder="Team name">
                     </div>
                 </div>
-
-                <!-- Team Name -->
-                <div class="form-group">
-                    <label class="form-label">
-                        Team Name
-                        <span class="confidence-badge" id="teamNameBadge" style="display:none">CHECK</span>
-                    </label>
-                    <input type="text" class="form-input" id="reviewTeamName" placeholder="Team name">
-                </div>
+                <div class="code-warning" id="codeWarning" style="display:none"></div>
 
                 <hr class="divider">
 
-                <!-- Answers Grid -->
-                <div class="answers-grid" id="answersGrid">
+                <!-- Answers — full width, one per line -->
+                <div class="answers-list" id="answersGrid">
                     <!-- Dynamically populated -->
                 </div>
 
@@ -441,12 +457,11 @@
                            style="max-width: 120px;">
                 </div>
 
-                <!-- Action buttons -->
-                <button class="camera-btn submit-btn" id="submitBtn" onclick="submitReviewed()">
-                    Submit Answers
-                </button>
-
+                <!-- Action buttons — side by side -->
                 <div class="btn-row">
+                    <button class="camera-btn submit-btn" id="submitBtn" onclick="submitReviewed()">
+                        Submit
+                    </button>
                     <button class="camera-btn retake-btn" onclick="retakePhoto()">
                         Retake
                     </button>
@@ -793,6 +808,14 @@
 
         // Refresh count every 30s
         setInterval(refreshTeamCount, 30000);
+
+        // --- Select all text on focus so host can immediately retype ---
+        document.getElementById('reviewSection').addEventListener('focusin', function(e) {
+            var el = e.target;
+            if (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'number')) {
+                el.select();
+            }
+        });
     </script>
     {% include '_toast.html' %}
 </body>
