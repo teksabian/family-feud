@@ -2552,7 +2552,8 @@ def photo_scan_upload():
         upload_dir = os.path.join(app.static_folder, 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        photo_filename = f'scan_{round_id}_{ts}.jpg'
+        unique = secrets.token_hex(4)
+        photo_filename = f'scan_{round_id}_{ts}_{unique}.jpg'
         photo_disk_path = os.path.join(upload_dir, photo_filename)
         try:
             with open(photo_disk_path, 'wb') as f:

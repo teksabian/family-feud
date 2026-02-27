@@ -756,6 +756,16 @@
             font-size: 0.75em;
             margin-left: 8px;
         }
+
+        /* Scored teams: read-only checkboxes */
+        .team-panel[data-scored="1"] .checkbox-row {
+            cursor: default;
+            opacity: 0.7;
+        }
+
+        .team-panel[data-scored="1"] .checkbox-row:hover {
+            background: rgba(255,255,255,0.05);
+        }
     </style>
 </head>
 <body>
@@ -1102,12 +1112,16 @@
 
         // ==================== SCORING ====================
         function toggleCheckbox(subId, ansNum, numAnswers) {
+            const panel = document.getElementById(`panel-${subId}`);
+            if (panel && panel.dataset.scored === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             cb.checked = !cb.checked;
             onCheckboxChange(subId, ansNum, numAnswers);
         }
 
         function onCheckboxChange(subId, ansNum, numAnswers) {
+            const panel = document.getElementById(`panel-${subId}`);
+            if (panel && panel.dataset.scored === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             const row = document.getElementById(`cb-row-${subId}-${ansNum}`);
             row.classList.toggle('checked', cb.checked);
