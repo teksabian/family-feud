@@ -10,6 +10,7 @@ import json
 import base64
 import time
 import html
+import secrets
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -183,6 +184,20 @@ def get_qr_base_url():
 def index():
     return redirect(url_for('auth.host_login'))
 
+
+@host_bp.route('/scan/<token>')
+def scan_qr_entry(token):
+    """QR code entry point — grants scanner session without password."""
+    stored_token = get_setting('scan_token')
+    if not stored_token or not secrets.compare_digest(token, stored_token):
+        logger.warning("[SCAN-AUTH] Invalid scan token attempted")
+        flash('Invalid or expired scan link.', 'error')
+        return redirect(url_for('auth.host_login'))
+    session['host_authenticated'] = True
+    logger.info("[SCAN-AUTH] Scan token validated — granting host session")
+    return redirect(url_for('scoring.photo_scan'))
+
+
 @host_bp.route('/host')
 @host_required
 def host_dashboard():
@@ -231,6 +246,14 @@ def host_dashboard():
                 WHERE round_id = ?
             """, (active_round['id'],)).fetchone()['cnt']
 
+    # Generate or retrieve scan token for QR code
+    scan_token = get_setting('scan_token')
+    if not scan_token:
+        scan_token = secrets.token_urlsafe(16)
+        set_setting('scan_token', scan_token, 'Token for passwordless scanner QR code')
+
+    qr_base_url = get_qr_base_url()
+
     logger.debug(f"[HOST] host_dashboard() - {len(codes)} codes, {len(rounds)} rounds, "
                  f"active_round={'R'+str(active_round['round_number']) if active_round else 'None'}, "
                  f"submissions={submission_count}, unscored={unscored_count}")
@@ -241,7 +264,9 @@ def host_dashboard():
                          unscored_count=unscored_count,
                          submission_count=submission_count,
                          rounds_config=ROUNDS_CONFIG,
-                         ai_scoring_available=AI_SCORING_ENABLED)
+                         ai_scoring_available=AI_SCORING_ENABLED,
+                         scan_token=scan_token,
+                         qr_base_url=qr_base_url)
 
 @host_bp.route('/host/codes-status')
 @host_required

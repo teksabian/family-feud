@@ -45,7 +45,27 @@
         .host-title {
             flex: 1;
         }
-        
+
+        .scan-qr {
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .scan-qr-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            border: 2px solid #ffd700;
+            background: #fff;
+            padding: 3px;
+        }
+
+        .scan-qr-label {
+            color: #ffd700;
+            font-size: 0.7em;
+            margin-top: 4px;
+        }
+
         .header h1 {
             color: #ffd700;
             font-size: 3em;
@@ -67,6 +87,9 @@
             }
             .host-logo {
                 width: 60px;
+            }
+            .scan-qr {
+                display: none;
             }
             .codes-list {
                 grid-template-columns: 1fr; /* Stack to single column on mobile */
@@ -673,6 +696,14 @@
                 <h1>PUB FAMILY FEUD</h1>
                 <p>Host Control Panel - Manage Game & View Scores</p>
             </div>
+            {% if ai_scoring_available and scan_token %}
+            <div class="scan-qr">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ qr_base_url }}/scan/{{ scan_token }}"
+                     alt="Scan to open photo scanner"
+                     class="scan-qr-img">
+                <div class="scan-qr-label">Phone Scanner</div>
+            </div>
+            {% endif %}
         </div>
         
         <div class="grid">
@@ -1196,7 +1227,7 @@
 
                     {% if ai_scoring_available %}
                     <p style="color: rgba(255,255,255,0.6); font-size: 0.85em; margin-top: 15px;">
-                        📷 To scan paper answers with your phone, open <strong style="color: #ffd700;">/host/scan</strong> on a mobile device
+                        📷 Scan the QR code in the header to open Photo Scan on your phone (no password needed)
                     </p>
                     {% endif %}
                 </div>
