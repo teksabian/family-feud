@@ -15,6 +15,8 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app
+import ai
+from config import PHOTO_SCAN_SINGLE_PROMPT
 
 
 class TestPhotoScanSinglePrompt(unittest.TestCase):
@@ -22,12 +24,11 @@ class TestPhotoScanSinglePrompt(unittest.TestCase):
 
     def test_single_prompt_exists(self):
         """PHOTO_SCAN_SINGLE_PROMPT should be defined"""
-        self.assertTrue(hasattr(app, 'PHOTO_SCAN_SINGLE_PROMPT'))
-        self.assertIn('SINGLE', app.PHOTO_SCAN_SINGLE_PROMPT.upper())
+        self.assertIn('SINGLE', PHOTO_SCAN_SINGLE_PROMPT.upper())
 
     def test_single_prompt_returns_flat_json(self):
         """Single prompt should request flat JSON (not nested under 'teams')"""
-        prompt = app.PHOTO_SCAN_SINGLE_PROMPT
+        prompt = PHOTO_SCAN_SINGLE_PROMPT
         self.assertIn('"code"', prompt)
         self.assertIn('"team_name"', prompt)
         self.assertIn('"answers"', prompt)
@@ -38,23 +39,23 @@ class TestPhotoScanSinglePrompt(unittest.TestCase):
 
     def test_single_prompt_asks_for_blank_on_unreadable(self):
         """Prompt should instruct AI to leave unreadable fields blank"""
-        prompt = app.PHOTO_SCAN_SINGLE_PROMPT
+        prompt = PHOTO_SCAN_SINGLE_PROMPT
         self.assertIn('blank', prompt.lower())
 
 
 class TestExtractSingleScorecard(unittest.TestCase):
     """Test the extract_single_scorecard function"""
 
-    @patch('app.ANTHROPIC_AVAILABLE', False)
+    @patch('ai.ANTHROPIC_AVAILABLE', False)
     def test_returns_none_when_ai_unavailable(self):
         """Should return None if Anthropic is not available"""
-        result = app.extract_single_scorecard('fake_base64')
+        result = ai.extract_single_scorecard('fake_base64')
         self.assertIsNone(result)
 
-    @patch('app.call_claude_api')
-    @patch('app.ANTHROPIC_AVAILABLE', True)
-    @patch('app.ANTHROPIC_API_KEY', 'test-key')
-    @patch('app.anthropic_client', MagicMock())
+    @patch('ai.call_claude_api')
+    @patch('ai.ANTHROPIC_AVAILABLE', True)
+    @patch('ai.ANTHROPIC_API_KEY', 'test-key')
+    @patch('ai.anthropic_client', MagicMock())
     def test_parses_valid_response(self, mock_call):
         """Should correctly parse a valid JSON response from Claude"""
         mock_message = MagicMock()
@@ -67,7 +68,7 @@ class TestExtractSingleScorecard(unittest.TestCase):
         }))]
         mock_call.return_value = mock_message
 
-        result = app.extract_single_scorecard('fake_base64')
+        result = ai.extract_single_scorecard('fake_base64')
 
         self.assertIsNotNone(result)
         self.assertEqual(result['code'], 'ABAR')
@@ -76,10 +77,10 @@ class TestExtractSingleScorecard(unittest.TestCase):
         self.assertEqual(result['tiebreaker'], 42)
         self.assertIn('answers.2', result['low_confidence_fields'])
 
-    @patch('app.call_claude_api')
-    @patch('app.ANTHROPIC_AVAILABLE', True)
-    @patch('app.ANTHROPIC_API_KEY', 'test-key')
-    @patch('app.anthropic_client', MagicMock())
+    @patch('ai.call_claude_api')
+    @patch('ai.ANTHROPIC_AVAILABLE', True)
+    @patch('ai.ANTHROPIC_API_KEY', 'test-key')
+    @patch('ai.anthropic_client', MagicMock())
     def test_pads_short_answers_list(self, mock_call):
         """Should pad answers to exactly 6 if fewer are returned"""
         mock_message = MagicMock()
@@ -91,14 +92,14 @@ class TestExtractSingleScorecard(unittest.TestCase):
         }))]
         mock_call.return_value = mock_message
 
-        result = app.extract_single_scorecard('fake_base64')
+        result = ai.extract_single_scorecard('fake_base64')
         self.assertEqual(len(result['answers']), 6)
         self.assertEqual(result['answers'][2], '')
 
-    @patch('app.call_claude_api')
-    @patch('app.ANTHROPIC_AVAILABLE', True)
-    @patch('app.ANTHROPIC_API_KEY', 'test-key')
-    @patch('app.anthropic_client', MagicMock())
+    @patch('ai.call_claude_api')
+    @patch('ai.ANTHROPIC_AVAILABLE', True)
+    @patch('ai.ANTHROPIC_API_KEY', 'test-key')
+    @patch('ai.anthropic_client', MagicMock())
     def test_handles_invalid_tiebreaker(self, mock_call):
         """Should default tiebreaker to 0 if not a valid int"""
         mock_message = MagicMock()
@@ -110,13 +111,13 @@ class TestExtractSingleScorecard(unittest.TestCase):
         }))]
         mock_call.return_value = mock_message
 
-        result = app.extract_single_scorecard('fake_base64')
+        result = ai.extract_single_scorecard('fake_base64')
         self.assertEqual(result['tiebreaker'], 0)
 
-    @patch('app.call_claude_api')
-    @patch('app.ANTHROPIC_AVAILABLE', True)
-    @patch('app.ANTHROPIC_API_KEY', 'test-key')
-    @patch('app.anthropic_client', MagicMock())
+    @patch('ai.call_claude_api')
+    @patch('ai.ANTHROPIC_AVAILABLE', True)
+    @patch('ai.ANTHROPIC_API_KEY', 'test-key')
+    @patch('ai.anthropic_client', MagicMock())
     def test_handles_array_response(self, mock_call):
         """Should return None (not crash) if model returns a JSON array instead of object"""
         mock_message = MagicMock()
@@ -125,7 +126,7 @@ class TestExtractSingleScorecard(unittest.TestCase):
         ]))]
         mock_call.return_value = mock_message
 
-        result = app.extract_single_scorecard('fake_base64')
+        result = ai.extract_single_scorecard('fake_base64')
         self.assertIsNone(result)
 
 
