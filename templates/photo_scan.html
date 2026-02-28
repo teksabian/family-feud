@@ -103,14 +103,6 @@
         }
         .camera-btn.retake-btn:hover { background: #5a6268; }
 
-        .camera-btn.finish-btn {
-            background: #dc3545;
-            font-size: 1em;
-            padding: 14px 20px;
-            min-height: auto;
-            margin-top: 5px;
-        }
-        .camera-btn.finish-btn:hover { background: #c82333; }
 
         .camera-hint {
             color: rgba(255,255,255,0.5);
@@ -388,9 +380,6 @@
                     Photograph one team's answer sheet
                 </p>
 
-                <button class="camera-btn finish-btn" onclick="window.location.href='{{ url_for('host.host_dashboard') }}?desktop=1&v={{ cache_bust }}'">
-                    Finish Scanning
-                </button>
             </div>
 
             <!-- ======== PROCESSING SECTION ======== -->
