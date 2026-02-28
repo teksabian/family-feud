@@ -801,6 +801,8 @@
                 <div class="left-panel">
                     <div class="panel-header">
                         <h3>Their Answers</h3>
+                        <button class="btn-sm btn-edit" id="editBtn-{{ sub.id }}"
+                                onclick="toggleEditMode({{ sub.id }}, {{ round.num_answers }})">&#9998; Edit</button>
                     </div>
                     <div class="their-answers-list" id="theirAnswers-{{ sub.id }}">
                         {% for i in range(1, round.num_answers + 1) %}
@@ -1043,8 +1045,6 @@
             // Update per-team action buttons (team mgmt + scoring in one bar)
             const actionsEl = document.getElementById('navActions');
             actionsEl.innerHTML = `
-                <button class="btn-sm btn-edit" id="editBtn-${subId}"
-                        onclick="toggleEditMode(${subId}, ${maxAnswers})">&#9998; Edit</button>
                 <button class="btn-sm btn-view" id="viewBtn-${subId}"
                         onclick="toggleTeamAnswers(${subId})">
                     ${isTeamVisible(subId) ? '&#128274; Hide' : '&#128065; View'}
