@@ -18,21 +18,22 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app
+import ai
 
 
 class TestBuildClaudeApiKwargs(unittest.TestCase):
     """Test the build_claude_api_kwargs helper function"""
 
-    @patch('app.get_setting')
+    @patch('ai.get_setting')
     def test_thinking_disabled_returns_temperature(self, mock_get_setting):
         """When thinking is disabled, should include temperature=0 and given max_tokens"""
         mock_get_setting.return_value = 'false'
-        result = app.build_claude_api_kwargs(max_tokens_default=1024)
+        result = ai.build_claude_api_kwargs(max_tokens_default=1024)
         self.assertEqual(result['max_tokens'], 1024)
         self.assertEqual(result['temperature'], 0)
         self.assertNotIn('thinking', result)
 
-    @patch('app.get_setting')
+    @patch('ai.get_setting')
     def test_thinking_enabled_returns_thinking_param(self, mock_get_setting):
         """When thinking is enabled, should include thinking dict and no temperature"""
         def side_effect(key, default=''):
@@ -43,7 +44,7 @@ class TestBuildClaudeApiKwargs(unittest.TestCase):
             return default
         mock_get_setting.side_effect = side_effect
 
-        result = app.build_claude_api_kwargs(max_tokens_default=1024)
+        result = ai.build_claude_api_kwargs(max_tokens_default=1024)
         self.assertNotIn('temperature', result)
         self.assertIn('thinking', result)
         self.assertEqual(result['thinking']['type'], 'enabled')
@@ -51,7 +52,7 @@ class TestBuildClaudeApiKwargs(unittest.TestCase):
         # max_tokens should be budget + default
         self.assertEqual(result['max_tokens'], 11024)
 
-    @patch('app.get_setting')
+    @patch('ai.get_setting')
     def test_thinking_budget_minimum_enforced(self, mock_get_setting):
         """Budget below 1024 should be clamped to 1024"""
         def side_effect(key, default=''):
@@ -62,19 +63,19 @@ class TestBuildClaudeApiKwargs(unittest.TestCase):
             return default
         mock_get_setting.side_effect = side_effect
 
-        result = app.build_claude_api_kwargs(max_tokens_default=1024)
+        result = ai.build_claude_api_kwargs(max_tokens_default=1024)
         self.assertEqual(result['thinking']['budget_tokens'], 1024)
         self.assertEqual(result['max_tokens'], 2048)
 
-    @patch('app.get_setting')
+    @patch('ai.get_setting')
     def test_thinking_disabled_photo_scan_max_tokens(self, mock_get_setting):
         """Photo scan uses max_tokens=2048 when thinking is off"""
         mock_get_setting.return_value = 'false'
-        result = app.build_claude_api_kwargs(max_tokens_default=2048)
+        result = ai.build_claude_api_kwargs(max_tokens_default=2048)
         self.assertEqual(result['max_tokens'], 2048)
         self.assertEqual(result['temperature'], 0)
 
-    @patch('app.get_setting')
+    @patch('ai.get_setting')
     def test_thinking_enabled_photo_scan_max_tokens(self, mock_get_setting):
         """Photo scan max_tokens should be budget + 2048 when thinking is on"""
         def side_effect(key, default=''):
@@ -85,7 +86,7 @@ class TestBuildClaudeApiKwargs(unittest.TestCase):
             return default
         mock_get_setting.side_effect = side_effect
 
-        result = app.build_claude_api_kwargs(max_tokens_default=2048)
+        result = ai.build_claude_api_kwargs(max_tokens_default=2048)
         self.assertEqual(result['max_tokens'], 7048)
         self.assertEqual(result['thinking']['budget_tokens'], 5000)
 
@@ -101,7 +102,7 @@ class TestExtractResponseText(unittest.TestCase):
         text_block.text = '{"matches": [1, 3]}'
         message.content = [text_block]
 
-        result = app.extract_response_text(message)
+        result = ai.extract_response_text(message)
         self.assertEqual(result, '{"matches": [1, 3]}')
 
     def test_thinking_plus_text_response(self):
@@ -114,7 +115,7 @@ class TestExtractResponseText(unittest.TestCase):
         text_block.text = '{"matches": [2]}'
         message.content = [thinking_block, text_block]
 
-        result = app.extract_response_text(message)
+        result = ai.extract_response_text(message)
         self.assertEqual(result, '{"matches": [2]}')
 
     def test_fallback_when_no_text_block(self):
@@ -125,7 +126,7 @@ class TestExtractResponseText(unittest.TestCase):
         block.text = 'fallback content'
         message.content = [block]
 
-        result = app.extract_response_text(message)
+        result = ai.extract_response_text(message)
         self.assertEqual(result, 'fallback content')
 
 
@@ -225,7 +226,7 @@ class TestCallClaudeApi(unittest.TestCase):
         client.messages.create.return_value = expected_message
 
         api_kwargs = {'max_tokens': 1024, 'temperature': 0}
-        result = app.call_claude_api(client, 'claude-sonnet-4-20250514',
+        result = ai.call_claude_api(client, 'claude-sonnet-4-20250514',
                                       [{'role': 'user', 'content': 'test'}], api_kwargs)
         client.messages.create.assert_called_once()
         client.messages.stream.assert_not_called()
@@ -238,7 +239,7 @@ class TestCallClaudeApi(unittest.TestCase):
         client.messages.create.return_value = expected_message
 
         api_kwargs = {'max_tokens': 11024, 'thinking': {'type': 'enabled', 'budget_tokens': 10000}}
-        result = app.call_claude_api(client, 'claude-opus-4-20250514',
+        result = ai.call_claude_api(client, 'claude-opus-4-20250514',
                                       [{'role': 'user', 'content': 'test'}], api_kwargs)
         client.messages.create.assert_called_once()
         client.messages.stream.assert_not_called()
@@ -255,7 +256,7 @@ class TestCallClaudeApi(unittest.TestCase):
         client.messages.stream.return_value = stream_ctx
 
         api_kwargs = {'max_tokens': 52048, 'thinking': {'type': 'enabled', 'budget_tokens': 50000}}
-        result = app.call_claude_api(client, 'claude-opus-4-20250514',
+        result = ai.call_claude_api(client, 'claude-opus-4-20250514',
                                       [{'role': 'user', 'content': 'test'}], api_kwargs)
         client.messages.create.assert_not_called()
         client.messages.stream.assert_called_once()
@@ -268,8 +269,8 @@ class TestCallClaudeApi(unittest.TestCase):
         expected_message = MagicMock()
         client.messages.create.return_value = expected_message
 
-        api_kwargs = {'max_tokens': app.STREAMING_THRESHOLD, 'thinking': {'type': 'enabled', 'budget_tokens': 20000}}
-        result = app.call_claude_api(client, 'claude-opus-4-20250514',
+        api_kwargs = {'max_tokens': ai.STREAMING_THRESHOLD, 'thinking': {'type': 'enabled', 'budget_tokens': 20000}}
+        result = ai.call_claude_api(client, 'claude-opus-4-20250514',
                                       [{'role': 'user', 'content': 'test'}], api_kwargs)
         client.messages.create.assert_called_once()
         client.messages.stream.assert_not_called()
