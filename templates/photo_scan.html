@@ -140,13 +140,6 @@
         }
 
         /* === REVIEW FORM === */
-        .review-header {
-            color: #ffd700;
-            font-size: 1.2em;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-
         .form-group {
             margin-bottom: 12px;
         }
@@ -283,15 +276,12 @@
 
         /* === PREVIEW IMAGE === */
         .preview-area {
-            margin: 10px 0;
-            text-align: center;
+            margin: 6px -20px 0;
         }
 
         .preview-img {
-            max-width: 100%;
-            max-height: 150px;
-            border-radius: 8px;
-            border: 2px solid #444;
+            width: 100%;
+            display: block;
         }
 
         .preview-toggle {
@@ -301,7 +291,7 @@
             text-decoration: underline;
             display: block;
             text-align: center;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         /* === ERROR === */
@@ -441,17 +431,7 @@
 
             <!-- ======== REVIEW SECTION ======== -->
             <div class="section" id="reviewSection">
-                <div class="review-header">Review & Edit</div>
-
-                <!-- Photo preview (collapsed by default) -->
-                <div class="preview-area" id="previewArea" style="display:none">
-                    <img id="previewImg" class="preview-img" alt="Scorecard photo">
-                </div>
-                <span class="preview-toggle" id="previewToggle" onclick="togglePreview()">Show photo</span>
-
-                <hr class="divider">
-
-                <!-- Code + Team Name on one compact row -->
+                <!-- Code + Team Name -->
                 <div class="team-row">
                     <div class="form-group code-group">
                         <label class="form-label">
@@ -475,7 +455,11 @@
                 </div>
                 <div class="code-warning" id="codeWarning" style="display:none"></div>
 
-                <hr class="divider">
+                <!-- Scorecard photo -->
+                <div class="preview-area" id="previewArea" style="display:none">
+                    <img id="previewImg" class="preview-img" alt="Scorecard photo">
+                </div>
+                <span class="preview-toggle" id="previewToggle" onclick="togglePreview()">Show photo</span>
 
                 <!-- Answers — full width, one per line -->
                 <div class="answers-list" id="answersGrid">
@@ -515,6 +499,7 @@
 
             <!-- ======== SUCCESS TOAST ======== -->
             <div class="success-toast" id="successToast"></div>
+
         </div>
 
         <a href="{{ url_for('host.host_dashboard') }}?desktop=1&v={{ cache_bust }}" class="back-link">Back to Dashboard</a>
@@ -534,6 +519,11 @@
                 s.classList.remove('active');
             });
             document.getElementById(sectionId).classList.add('active');
+
+            // Hide header chrome during review to maximize data space
+            var isReview = (sectionId === 'reviewSection');
+            document.querySelector('.header').style.display = isReview ? 'none' : '';
+            document.getElementById('scanCounter').style.display = isReview ? 'none' : '';
         }
 
         function updateCounter() {
@@ -700,6 +690,10 @@
                 tbInput.classList.remove('low-confidence');
                 document.getElementById('tiebreakerBadge').style.display = 'none';
             }
+
+            // Show full photo expanded so host can cross-check answers
+            document.getElementById('previewArea').style.display = 'block';
+            document.getElementById('previewToggle').textContent = 'Hide photo';
 
             showSection('reviewSection');
         }
