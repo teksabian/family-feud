@@ -261,65 +261,6 @@
             font-size: 1.1em;
         }
 
-        /* === ANSWER ROW WITH CROP IMAGE === */
-        .answer-row-flex {
-            display: flex;
-            gap: 8px;
-            align-items: stretch;
-        }
-
-        .answer-row-flex .answer-input-col {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .answer-row-flex .answer-input-col .form-input {
-            width: 100%;
-        }
-
-        .answer-crop-col {
-            flex: 0 0 80px;
-            display: flex;
-            align-items: center;
-        }
-
-        .answer-crop-img {
-            width: 80px;
-            height: 100%;
-            max-height: 48px;
-            object-fit: cover;
-            border-radius: 6px;
-            border: 1px solid #555;
-            cursor: pointer;
-            background: #111;
-        }
-
-        /* Lightbox for enlarged crop */
-        .crop-lightbox {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.85);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .crop-lightbox.active {
-            display: flex;
-        }
-
-        .crop-lightbox img {
-            max-width: 100%;
-            max-height: 80vh;
-            border-radius: 8px;
-            border: 2px solid #ffd700;
-        }
-
         .divider {
             border: none;
             border-top: 1px solid #333;
@@ -348,7 +289,7 @@
 
         .preview-img {
             max-width: 100%;
-            max-height: 150px;
+            max-height: 260px;
             border-radius: 8px;
             border: 2px solid #444;
         }
@@ -575,10 +516,6 @@
             <!-- ======== SUCCESS TOAST ======== -->
             <div class="success-toast" id="successToast"></div>
 
-            <!-- ======== CROP LIGHTBOX ======== -->
-            <div class="crop-lightbox" id="cropLightbox" onclick="this.classList.remove('active')">
-                <img id="cropLightboxImg" src="" alt="Enlarged answer crop">
-            </div>
         </div>
 
         <a href="{{ url_for('host.host_dashboard') }}?desktop=1&v={{ cache_bust }}" class="back-link">Back to Dashboard</a>
@@ -591,7 +528,6 @@
         let totalTeams = {{ total_teams }};
         let currentPhotoPath = null;
         let currentBase64 = null;
-        let currentCropImage = null;
 
         // --- Section management ---
         function showSection(sectionId) {
@@ -642,9 +578,8 @@
                 var base64 = dataUrl.split(',')[1];
                 currentBase64 = base64;
 
-                // Set preview image and store for cropping
+                // Set preview image
                 document.getElementById('previewImg').src = dataUrl;
-                currentCropImage = img;
 
                 extractFromPhoto(base64);
             };
@@ -687,51 +622,6 @@
             }
         }
 
-        // --- Heuristic answer regions based on printed form layout ---
-        function getHeuristicRegions(numAnswers) {
-            // Form layout proportions (tuned from real photo testing):
-            // - Top ~30%: Round label + Team Name/Code header + spacing
-            // - Bottom ~30%: Tiebreaker footer + QR code + spacing
-            // - Middle ~40%: answer rows distributed with space-evenly
-            var headerFrac = 0.30;
-            var footerFrac = 0.30;
-            var answersStart = headerFrac;
-            var answersEnd = 1.0 - footerFrac;
-            var answersHeight = answersEnd - answersStart;
-            var stripHeight = answersHeight / numAnswers;
-
-            var regions = [];
-            for (var i = 0; i < numAnswers; i++) {
-                regions.push({
-                    y_start: answersStart + i * stripHeight,
-                    y_end: answersStart + (i + 1) * stripHeight
-                });
-            }
-            return regions;
-        }
-
-        // --- Crop answer region from photo ---
-        function cropAnswerRegion(region) {
-            if (!currentCropImage || !currentCropImage.naturalWidth || !region) return null;
-            var fullW = currentCropImage.naturalWidth;
-            var fullH = currentCropImage.naturalHeight;
-            var yStart = Math.max(0, Math.floor(region.y_start * fullH));
-            var yEnd = Math.min(fullH, Math.ceil(region.y_end * fullH));
-            var cropH = yEnd - yStart;
-            if (cropH <= 0) return null;
-            var canvas = document.createElement('canvas');
-            canvas.width = fullW;
-            canvas.height = cropH;
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(currentCropImage, 0, yStart, fullW, cropH, 0, 0, fullW, cropH);
-            return canvas.toDataURL('image/jpeg', 0.85);
-        }
-
-        function openCropLightbox(src) {
-            document.getElementById('cropLightboxImg').src = src;
-            document.getElementById('cropLightbox').classList.add('active');
-        }
-
         // --- Review form ---
         function populateReviewForm(data) {
             var extracted = data.extracted;
@@ -772,7 +662,6 @@
             // Build answer fields
             var grid = document.getElementById('answersGrid');
             grid.innerHTML = '';
-            var answerRegions = currentCropImage ? getHeuristicRegions(NUM_ANSWERS) : [];
             for (var i = 0; i < NUM_ANSWERS; i++) {
                 var isLowConf = lowConf.indexOf('answers.' + i) !== -1;
                 var val = (extracted.answers && extracted.answers[i]) || '';
@@ -797,39 +686,8 @@
                 input.placeholder = 'Answer ' + (i + 1);
                 input.value = val;
 
-                // Try to crop the answer region from the photo
-                var cropDataUrl = (answerRegions.length > i && answerRegions[i]) ? cropAnswerRegion(answerRegions[i]) : null;
-
-                if (cropDataUrl) {
-                    // Side-by-side layout: input left, crop right
-                    var wrapper = document.createElement('div');
-                    wrapper.className = 'answer-row-flex';
-
-                    var inputCol = document.createElement('div');
-                    inputCol.className = 'answer-input-col';
-                    inputCol.appendChild(input);
-                    wrapper.appendChild(inputCol);
-
-                    var cropCol = document.createElement('div');
-                    cropCol.className = 'answer-crop-col';
-                    var cropImg = document.createElement('img');
-                    cropImg.className = 'answer-crop-img';
-                    cropImg.src = cropDataUrl;
-                    cropImg.alt = 'Answer ' + (i + 1) + ' handwriting';
-                    cropImg.onclick = (function(src) {
-                        return function() { openCropLightbox(src); };
-                    })(cropDataUrl);
-                    cropCol.appendChild(cropImg);
-                    wrapper.appendChild(cropCol);
-
-                    group.appendChild(label);
-                    group.appendChild(wrapper);
-                } else {
-                    // No crop available — original layout
-                    group.appendChild(label);
-                    group.appendChild(input);
-                }
-
+                group.appendChild(label);
+                group.appendChild(input);
                 grid.appendChild(group);
             }
 
@@ -843,6 +701,10 @@
                 tbInput.classList.remove('low-confidence');
                 document.getElementById('tiebreakerBadge').style.display = 'none';
             }
+
+            // Show full photo expanded so host can cross-check answers
+            document.getElementById('previewArea').style.display = 'block';
+            document.getElementById('previewToggle').textContent = 'Hide photo';
 
             showSection('reviewSection');
         }
@@ -941,7 +803,6 @@
             document.getElementById('previewToggle').textContent = 'Show photo';
             currentPhotoPath = null;
             currentBase64 = null;
-            currentCropImage = null;
 
             // Hide toast after 2.5s
             setTimeout(function() {
@@ -954,7 +815,6 @@
             document.getElementById('photoInput').value = '';
             currentPhotoPath = null;
             currentBase64 = null;
-            currentCropImage = null;
             document.getElementById('previewArea').style.display = 'none';
             document.getElementById('previewToggle').textContent = 'Show photo';
             showSection('cameraSection');
@@ -966,7 +826,6 @@
             document.getElementById('photoInput').value = '';
             currentPhotoPath = null;
             currentBase64 = null;
-            currentCropImage = null;
             showSection('cameraSection');
         }
 
