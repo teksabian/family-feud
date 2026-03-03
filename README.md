@@ -1,6 +1,6 @@
 # Family Feud — Pub Trivia Game
 
-*A Flask-powered Family Feud clone for pub trivia nights. Teams join via QR codes, Claude does the homework, and the database deletes itself when you're done.*
+*A Flask-powered Family Feud clone for pub trivia nights. Teams join via QR codes, AI does the homework, and the database deletes itself when you're done.*
 
 ---
 
@@ -38,7 +38,7 @@ The bartender will not need to help anyone with setup.
 - ➕ Manual round creation (question + answer list, one at a time)
 
 ### AI Scoring
-- 🤖 Claude API semantic answer matching: understands synonyms, abbreviations, and specific-to-general matches ("minivan" → "van")
+- 🤖 AI semantic answer matching (Claude or GPT): understands synonyms, abbreviations, and specific-to-general matches ("minivan" → "van")
 - 👀 Host reviews AI suggestions before anything is saved — AI suggests, host decides
 - 🧠 Training feedback loop: your corrections are saved to `corrections_history.json` and fed back into future calls
 - 💰 ~$0.01 per round scored *(cheaper than hiring a scorer, more reliable than asking a regular)*
@@ -172,13 +172,14 @@ Set in Render dashboard (or your local `.env` file):
 | `SECRET_KEY` | Yes (Render auto-generates) | Random token | Flask session signing |
 | `HOST_PASSWORD` | Yes | `localdev` *(dev only)* | Host dashboard PIN |
 | `RENDER` | Cloud only | unset | Enables cloud mode (logging, URL detection) |
-| `ANTHROPIC_API_KEY` | No | unset | Required for AI scoring |
+| `ANTHROPIC_API_KEY` | No | unset | Anthropic Claude API key (one provider required for AI scoring) |
+| `OPENAI_API_KEY` | No | unset | OpenAI API key (alternative AI provider) |
 | `ENABLE_AI_SCORING` | No | `false` | Must be `true` to activate AI scoring |
-| `AI_MODEL` | No | `claude-sonnet-4-20250514` | Override the Claude model used |
+| `AI_MODEL` | No | auto (first available) | Override the AI model (Claude or GPT) |
 | `GITHUB_TOKEN` | No | unset | Sync AI corrections history to a GitHub repo |
 | `LOG_LEVEL` | No | `INFO` | Set to `DEBUG` for verbose troubleshooting |
 
-> **AI Scoring requires both** `ANTHROPIC_API_KEY` **and** `ENABLE_AI_SCORING=true`. Setting the API key without the flag is like buying ingredients and never cooking — the feature stays off.
+> **AI Scoring requires** `ENABLE_AI_SCORING=true` **and** at least one API key (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`). Both can be set — pick your model from the settings dropdown.
 
 ---
 
@@ -209,11 +210,11 @@ Full details: [docs/architecture/NUCLEAR_RESET.md](docs/architecture/NUCLEAR_RES
 
 ### AI Scoring
 
-Optional Claude API integration for semantic answer matching. The AI understands synonyms, abbreviations, and the difference between "NY" and "New York." Host reviews all suggestions before anything is saved — the AI recommends, the host decides.
+Optional AI integration (Anthropic Claude or OpenAI GPT) for semantic answer matching. The AI understands synonyms, abbreviations, and the difference between "NY" and "New York." Host reviews all suggestions before anything is saved — the AI recommends, the host decides.
 
 Your corrections are saved to `corrections_history.json` and fed back into future scoring calls, so the AI gradually learns your scoring philosophy (or at least stops suggesting the same wrong answer twice).
 
-Requires `ANTHROPIC_API_KEY` + `ENABLE_AI_SCORING=true`. Cost is ~$0.01 per round scored.
+Requires `ENABLE_AI_SCORING=true` + at least one API key (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`).
 
 Full details: [docs/features/AI_SCORING.md](docs/features/AI_SCORING.md)
 
@@ -273,7 +274,7 @@ python tests/test_photo_capture_review.py
 | **Frontend** | Vanilla JS + HTML/CSS *(no framework, no build step, just JavaScript doing its best)* |
 | **QR Codes** | qrcode + Pillow |
 | **Document Upload** | python-docx + python-pptx |
-| **AI Scoring** | anthropic >= 0.55.0 *(optional)* |
+| **AI Scoring** | anthropic >= 0.55.0 / openai >= 1.30.0 *(optional — one or both)* |
 | **Deployment** | Render.com |
 
 ---
@@ -284,7 +285,7 @@ python tests/test_photo_capture_review.py
 |---|---|
 | Render Free Tier | $0/month *(app sleeps after 15 min of inactivity)* |
 | Render Starter Tier | $7/month *(always on — recommended for pub nights)* |
-| AI Scoring (Anthropic) | ~$0.01 per round scored |
+| AI Scoring (Anthropic / OpenAI) | ~$0.001–$0.05 per round (depends on model) |
 | SQLite / ephemeral DB | Free *(the database deletes itself, saving you money and therapy)* |
 
 ---
@@ -328,7 +329,7 @@ Built for weekly pub trivia nights at Game Night Guild local venues.
 
 Powered by Flask, Gunicorn, and a determination to avoid spreadsheets.
 
-AI scoring powered by Claude (Anthropic) — who also wrote the test suite and therefore has some skin in the game.
+AI scoring powered by Claude (Anthropic) and GPT (OpenAI) — who also wrote the test suite and therefore have some skin in the game.
 
 Ten prebuilt surveys included so you don't have to spend Friday afternoon writing trivia questions.
 
@@ -342,4 +343,4 @@ Private use for Game Night Guild pub trivia events.
 
 ---
 
-**v3.0.1 - Fission** | Battle-tested at actual pub nights | Survey SAYS: production ready. 🍻
+**v3.1.0 - Fission** | Battle-tested at actual pub nights | Survey SAYS: production ready. 🍻

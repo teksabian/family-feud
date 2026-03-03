@@ -1,13 +1,13 @@
 # AI-Assisted Scoring
 
 **Added in:** v2.0.1
-**API:** Claude (Anthropic)
+**API:** Claude (Anthropic) or GPT (OpenAI)
 
 ---
 
 ## Overview
 
-The host can optionally send any team's answers to Claude AI for automated scoring. AI evaluates semantic matches between team answers and survey answers. The host reviews suggestions and can accept, modify, or ignore them.
+The host can optionally send any team's answers to AI for automated scoring. AI evaluates semantic matches between team answers and survey answers. The host reviews suggestions and can accept, modify, or ignore them.
 
 ## How It Works
 
@@ -27,22 +27,26 @@ The host can optionally send any team's answers to Claude AI for automated scori
 
 ## Setup
 
-1. Get an API key from [console.anthropic.com](https://console.anthropic.com/)
-2. Add `ANTHROPIC_API_KEY` as an environment variable on Render
+1. Get an API key from one (or both) providers:
+   - **Anthropic:** [console.anthropic.com](https://console.anthropic.com/)
+   - **OpenAI:** [platform.openai.com](https://platform.openai.com/)
+2. Add your API key(s) as environment variables on Render:
+   - `ANTHROPIC_API_KEY` for Claude models
+   - `OPENAI_API_KEY` for GPT models
 3. Set `ENABLE_AI_SCORING=true` as an environment variable on Render
-4. Deploy — feature is live
+4. Deploy — pick your model from the Settings dropdown
 
-> **Both** `ANTHROPIC_API_KEY` **and** `ENABLE_AI_SCORING=true` are required. The API key alone won't activate the feature.
+> `ENABLE_AI_SCORING=true` **plus** at least one API key is required. Both keys can be set — the settings dropdown will show all available models grouped by provider.
 
 ## Fallback Behavior
 
-- **No API key:** Button appears but shows "AI scoring not configured"
+- **No API key:** AI scoring section hidden in settings
 - **API call fails:** Error message shown, manual scoring still works
 - **Always safe:** Manual scoring is always available regardless of AI status
 
 ## Cost
 
-~$0.01 per scoring (1 penny). 100 scorings = ~$1.
+Cost depends on the model selected. Ranges from ~$0.001 (GPT-4o-mini) to ~$0.05 (Claude Opus 4) per scoring.
 
 ## AI Training (v2.0.3+)
 

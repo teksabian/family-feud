@@ -24,6 +24,6 @@ python -m unittest discover tests/ # Run tests
 
 - Modular Flask app: `app.py` (entry point), `config.py`, `database.py`, `auth.py`, `ai.py`, `parsers.py`, with route blueprints in `routes/` and Jinja2 templates in `templates/`.
 - All state is ephemeral — SQLite on ephemeral filesystem, wiped on every server restart (nuclear reset design).
-- AI scoring via Anthropic Claude API is optional (`ENABLE_AI_SCORING` env var).
+- AI scoring via Anthropic Claude or OpenAI GPT is optional (`ENABLE_AI_SCORING` env var).
 - Environment variables are documented in `.env.example` and in `README.md`.
 - Tests use Python `unittest` in `tests/`.
