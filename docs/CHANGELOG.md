@@ -4,6 +4,14 @@ All notable changes to Family Feud (Pub Feud) are documented here. Reverse chron
 
 ---
 
+## v3.1.0 - Fission (Mar 3, 2026)
+- Add OpenAI models as alternative AI provider (GPT-5.2, GPT-4o, GPT-4o-mini)
+- Host can pick between Anthropic Claude and OpenAI GPT models from settings dropdown
+- Models grouped by provider in settings UI with `<optgroup>` labels
+- Extended Thinking toggle hidden when OpenAI model selected (Anthropic-only feature)
+- AI scoring and photo OCR work with either provider — same prompts, same UI
+- Only models whose provider API key is configured appear in the dropdown
+
 ## v3.0.1 - Fission (Feb 28, 2026)
 - Fix scanner to auto-advance when host activates next round (no more manual refresh)
 - Show waiting screen on phone scanner when no active round instead of error toast

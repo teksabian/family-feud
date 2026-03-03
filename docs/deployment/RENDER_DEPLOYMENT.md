@@ -54,7 +54,9 @@ Set these in Render dashboard under Environment:
 |----------|----------|-------------|
 | `SECRET_KEY` | Yes | Flask session key (generate a random string) |
 | `HOST_PASSWORD` | Yes | PIN for host panel access |
-| `ANTHROPIC_API_KEY` | Optional | Claude API key for AI scoring |
+| `ANTHROPIC_API_KEY` | Optional | Anthropic Claude API key for AI scoring |
+| `OPENAI_API_KEY` | Optional | OpenAI API key for AI scoring (alternative to Anthropic) |
+| `ENABLE_AI_SCORING` | Optional | Set to `true` to activate AI scoring |
 | `RENDER` | Auto | Set automatically by Render |
 | `RENDER_EXTERNAL_URL` | Auto | The service's public URL (set by Render) |
 | `QR_BASE_URL` | Optional | Override the default QR code URL |
