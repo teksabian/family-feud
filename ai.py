@@ -164,7 +164,7 @@ def get_provider_for_model(model_id):
 # ============= OPENAI HELPERS =============
 
 # Reasoning models use reasoning_effort instead of temperature
-OPENAI_REASONING_MODELS = frozenset({'gpt-5.2', 'gpt-5.2-pro'})
+OPENAI_REASONING_MODELS = frozenset({'gpt-5.2'})
 
 def call_openai_api(client, model, messages, max_tokens=1024):
     """Call OpenAI Chat Completions API. Handles both standard and reasoning models."""
