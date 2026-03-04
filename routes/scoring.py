@@ -17,10 +17,89 @@ from flask import Blueprint, request, render_template, redirect, url_for, jsonif
 
 from config import logger, AI_SCORING_ENABLED, time_ago, format_timestamp
 from auth import host_required
-from database import db_connect, get_setting
+from database import db_connect, get_setting, set_setting
 from ai import save_correction_to_history, extract_single_scorecard, extract_answers_from_photo, score_with_ai
 
 scoring_bp = Blueprint('scoring', __name__)
+
+
+def run_ai_scoring_for_submission(submission_id):
+    """Shared helper: run AI scoring for a submission and persist results to DB.
+
+    Used by both the manual AI scoring endpoint and background auto-scoring.
+    Returns the AI result dict {'matches': [...], 'reasoning': [...]} or None on error.
+    """
+    try:
+        with db_connect() as conn:
+            submission = conn.execute(
+                "SELECT * FROM submissions WHERE id = ?", (submission_id,)
+            ).fetchone()
+
+            if not submission:
+                logger.error(f"[AI-SCORING] Submission {submission_id} not found")
+                return None
+
+            round_info = conn.execute(
+                "SELECT * FROM rounds WHERE id = ?", (submission['round_id'],)
+            ).fetchone()
+
+            if not round_info:
+                logger.error(f"[AI-SCORING] Round {submission['round_id']} not found")
+                return None
+
+            # Build survey answers list
+            survey_answers = []
+            for i in range(1, round_info['num_answers'] + 1):
+                answer = round_info[f'answer{i}']
+                if answer:
+                    survey_answers.append({
+                        'number': i,
+                        'text': answer,
+                        'points': round_info['num_answers'] - i + 1
+                    })
+
+            # Build team answers list (only non-blank)
+            team_answers = []
+            for i in range(1, round_info['num_answers'] + 1):
+                answer = submission[f'answer{i}']
+                if answer and answer.strip():
+                    team_answers.append(answer.strip())
+
+            if not team_answers:
+                logger.info(f"[AI-SCORING] No team answers to score for submission {submission_id}")
+                return {'matches': [], 'reasoning': []}
+
+            logger.debug(f"[AI-SCORING] Scoring {len(team_answers)} team answers against {len(survey_answers)} survey answers")
+
+            ai_result = score_with_ai(
+                question=round_info['question'],
+                survey_answers=survey_answers,
+                team_answers=team_answers
+            )
+
+            matches = ai_result.get('matches', [])
+            reasoning = ai_result.get('reasoning', [])
+
+            # Derive matches from reasoning for consistency
+            derived_matches = set()
+            for entry in reasoning:
+                if entry.get('matched_to') is not None:
+                    derived_matches.add(entry['matched_to'])
+
+            # Persist AI results to DB
+            conn.execute(
+                "UPDATE submissions SET ai_matches = ?, ai_reasoning = ? WHERE id = ?",
+                (','.join(str(m) for m in sorted(derived_matches)), json.dumps(reasoning), submission_id)
+            )
+            conn.commit()
+
+            logger.info(f"[AI-SCORING] Result for submission {submission_id}: matches={matches}, reasoning_count={len(reasoning)}")
+            return ai_result
+
+    except Exception as e:
+        logger.error(f"[AI-SCORING] Error scoring submission {submission_id}: {e}", exc_info=True)
+        return None
+
 
 # ============= SCORING ROUTES =============
 
@@ -58,8 +137,13 @@ def scoring_queue():
                 checked_list = [int(x) for x in checked_str.split(',') if x.strip()]
                 auto_checks = {i: (i in checked_list) for i in range(1, active_round['num_answers'] + 1)}
             else:
-                # Unscored: all boxes unchecked by default
-                auto_checks = {i: False for i in range(1, active_round['num_answers'] + 1)}
+                # Unscored: pre-populate from AI results if available, else all unchecked
+                ai_matches_str = sub_dict.get('ai_matches', '') or ''
+                if ai_matches_str:
+                    ai_match_list = [int(x) for x in ai_matches_str.split(',') if x.strip()]
+                    auto_checks = {i: (i in ai_match_list) for i in range(1, active_round['num_answers'] + 1)}
+                else:
+                    auto_checks = {i: False for i in range(1, active_round['num_answers'] + 1)}
                 unscored_count += 1
 
             sub_dict['auto_checks'] = auto_checks
@@ -67,11 +151,13 @@ def scoring_queue():
             submissions_data.append(sub_dict)
     logger.debug(f"[SCORING] scoring_queue() - {len(submissions_data)} total submissions ({unscored_count} unscored) for round {active_round['round_number']}")
     ai_enabled = AI_SCORING_ENABLED and get_setting('ai_scoring_enabled', 'true') == 'true'
+    auto_ai_scoring = ai_enabled and get_setting('auto_ai_scoring', 'false') == 'true'
     return render_template('scoring_queue.html',
                          round=dict(active_round),
                          submissions=submissions_data,
                          unscored_count=unscored_count,
-                         ai_scoring_enabled=ai_enabled)
+                         ai_scoring_enabled=ai_enabled,
+                         auto_ai_scoring=auto_ai_scoring)
 
 @scoring_bp.route('/host/count-unscored')
 @host_required
@@ -89,6 +175,16 @@ def count_unscored():
         """, (active_round['id'],)).fetchone()['cnt']
         logger.debug(f"[API] count_unscored() = {count}")
         return jsonify({'count': count})
+
+@scoring_bp.route('/host/toggle-auto-ai-scoring', methods=['POST'])
+@host_required
+def toggle_auto_ai_scoring():
+    """AJAX endpoint: toggle the auto_ai_scoring setting, return new state as JSON"""
+    current_value = get_setting('auto_ai_scoring', 'false')
+    new_value = 'false' if current_value == 'true' else 'true'
+    set_setting('auto_ai_scoring', new_value, 'Auto AI score new submissions on the scoring queue')
+    logger.info(f"[SETTINGS] toggle_auto_ai_scoring: '{current_value}' -> '{new_value}'")
+    return jsonify({'success': True, 'auto_ai_scoring': new_value == 'true'})
 
 @scoring_bp.route('/host/score-team/<int:submission_id>', methods=['POST'])
 @host_required
@@ -277,65 +373,15 @@ def ai_score_submission(submission_id):
         logger.error("[AI-SCORING] AI scoring disabled in settings")
         return jsonify({'error': 'AI scoring is turned off in settings'}), 500
 
-    try:
-        with db_connect() as conn:
-            submission = conn.execute(
-                "SELECT * FROM submissions WHERE id = ?", (submission_id,)
-            ).fetchone()
+    ai_result = run_ai_scoring_for_submission(submission_id)
+    if ai_result is None:
+        return jsonify({'error': 'AI scoring failed'}), 500
 
-            if not submission:
-                logger.error(f"[AI-SCORING] Submission {submission_id} not found")
-                return jsonify({'error': 'Submission not found'}), 404
-
-            round_info = conn.execute(
-                "SELECT * FROM rounds WHERE id = ?", (submission['round_id'],)
-            ).fetchone()
-
-            if not round_info:
-                logger.error(f"[AI-SCORING] Round {submission['round_id']} not found")
-                return jsonify({'error': 'Round not found'}), 404
-
-            # Build survey answers list
-            survey_answers = []
-            for i in range(1, round_info['num_answers'] + 1):
-                answer = round_info[f'answer{i}']
-                if answer:
-                    survey_answers.append({
-                        'number': i,
-                        'text': answer,
-                        'points': round_info['num_answers'] - i + 1
-                    })
-
-            # Build team answers list (only non-blank)
-            team_answers = []
-            for i in range(1, round_info['num_answers'] + 1):
-                answer = submission[f'answer{i}']
-                if answer and answer.strip():
-                    team_answers.append(answer.strip())
-
-            if not team_answers:
-                logger.info("[AI-SCORING] No team answers to score")
-                return jsonify({'success': True, 'matches': [], 'reasoning': []})
-
-            logger.debug(f"[AI-SCORING] Scoring {len(team_answers)} team answers against {len(survey_answers)} survey answers")
-
-            ai_result = score_with_ai(
-                question=round_info['question'],
-                survey_answers=survey_answers,
-                team_answers=team_answers
-            )
-
-            logger.info(f"[AI-SCORING] Result: matches={ai_result['matches']}, reasoning_count={len(ai_result.get('reasoning', []))}")
-
-            return jsonify({
-                'success': True,
-                'matches': ai_result['matches'],
-                'reasoning': ai_result.get('reasoning', [])
-            })
-
-    except Exception as e:
-        logger.error(f"[AI-SCORING] Error: {e}", exc_info=True)
-        return jsonify({'error': f'AI scoring failed: {str(e)}'}), 500
+    return jsonify({
+        'success': True,
+        'matches': ai_result.get('matches', []),
+        'reasoning': ai_result.get('reasoning', [])
+    })
 
 @scoring_bp.route('/host/undo-score/<int:submission_id>', methods=['POST'])
 @host_required

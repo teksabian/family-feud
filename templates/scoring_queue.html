@@ -89,6 +89,69 @@
             white-space: nowrap;
         }
 
+        /* ============ AUTO AI SCORING TOGGLE ============ */
+        .auto-ai-toggle-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #1a1a1a;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            user-select: none;
+        }
+
+        .auto-ai-toggle-wrap:hover {
+            border-color: #888;
+        }
+
+        .auto-ai-toggle-wrap.active {
+            border-color: #7c3aed;
+            background: rgba(124, 58, 237, 0.15);
+        }
+
+        .auto-ai-toggle-label {
+            color: #ccc;
+            font-size: 0.8em;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .auto-ai-toggle-wrap.active .auto-ai-toggle-label {
+            color: #c4b5fd;
+        }
+
+        .auto-ai-switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: #555;
+            border-radius: 22px;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+
+        .auto-ai-switch.active {
+            background: #7c3aed;
+        }
+
+        .auto-ai-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .auto-ai-switch.active .auto-ai-slider {
+            transform: translateX(18px);
+        }
+
         /* ============ TEAM NAVIGATION BAR ============ */
         .team-nav-bar {
             background: #000;
@@ -751,7 +814,18 @@
                 <p>"{{ round.question }}"</p>
             </div>
             <div class="top-bar-right">
-                <button onclick="window.location.href='/host'">← Dashboard</button>
+                <button onclick="window.location.href='/host'">&#8592; Dashboard</button>
+                {% if ai_scoring_enabled %}
+                <div class="auto-ai-toggle-wrap {% if auto_ai_scoring %}active{% endif %}"
+                     id="autoAiToggleWrap"
+                     onclick="toggleAutoAiScoring()"
+                     title="When ON, new submissions are automatically AI scored">
+                    <span class="auto-ai-toggle-label">Auto AI</span>
+                    <div class="auto-ai-switch {% if auto_ai_scoring %}active{% endif %}" id="autoAiSwitch">
+                        <div class="auto-ai-slider"></div>
+                    </div>
+                </div>
+                {% endif %}
                 <button onclick="checkForUnsaved()" id="refreshBtn">
                     Refresh (<span id="unscoredCount">{{ unscored_count }}</span> waiting)
                 </button>
@@ -792,7 +866,9 @@
              data-team-name="{{ sub.team_name if sub.team_name else '[Deleted Team]' }}"
              data-team-code="{{ sub.code }}"
              data-submitted-time="{{ sub.submitted_time }}"
-             data-score="{{ sub.score }}">
+             data-score="{{ sub.score }}"
+             data-ai-matches="{{ sub.ai_matches or '' }}"
+             data-ai-reasoning="{{ sub.ai_reasoning or '' }}">
 
             <!-- Main Scoring Area: 32% left / 68% right -->
             <div class="scoring-area" id="scoringArea-{{ sub.id }}">
@@ -851,8 +927,8 @@
                     <form method="POST" action="{{ url_for('scoring.score_team', submission_id=sub.id) }}"
                           onsubmit="return submitScoreAjax(event, this, {{ sub.id }})"
                           id="form-{{ sub.id }}">
-                        <input type="hidden" name="ai_matches" id="ai-matches-{{ sub.id }}" value="">
-                        <input type="hidden" name="ai_reasoning" id="ai-reasoning-data-{{ sub.id }}" value="">
+                        <input type="hidden" name="ai_matches" id="ai-matches-{{ sub.id }}" value="{{ sub.ai_matches or '' }}">
+                        <input type="hidden" name="ai_reasoning" id="ai-reasoning-data-{{ sub.id }}" value="{{ sub.ai_reasoning|e if sub.ai_reasoning else '' }}">
 
                         <div class="right-panel-header">
                             <h3>Award Points For</h3>
@@ -940,6 +1016,8 @@
         const aiScoredSubmissions = new Set();
         const aiThinkingSubmissions = new Set();
         const aiScoringEnabled = {{ 'true' if ai_scoring_enabled else 'false' }};
+        let autoAiScoringEnabled = {{ 'true' if auto_ai_scoring else 'false' }};
+        let lastKnownUnscoredCount = {{ unscored_count }};
 
         // ==================== NAVIGATION ====================
         function showTeam(index) {
@@ -1210,6 +1288,7 @@
                         refreshBtn.style.background = '#333';
                         refreshBtn.style.color = '#fff';
                     }
+                    lastKnownUnscoredCount = data.count;
                 }
 
                 if (leftCounter) {
@@ -1632,6 +1711,124 @@
             return div.innerHTML;
         }
 
+        // ==================== AUTO AI SCORING ====================
+        async function toggleAutoAiScoring() {
+            try {
+                const response = await fetch('/host/toggle-auto-ai-scoring', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    autoAiScoringEnabled = data.auto_ai_scoring;
+
+                    const wrap = document.getElementById('autoAiToggleWrap');
+                    const sw = document.getElementById('autoAiSwitch');
+                    if (autoAiScoringEnabled) {
+                        wrap.classList.add('active');
+                        sw.classList.add('active');
+                        if (typeof showToast === 'function') {
+                            showToast('Auto AI Scoring ON \u2013 scoring unscored submissions...', 'success', 4000);
+                        }
+                        triggerAutoAiScoringForAll();
+                    } else {
+                        wrap.classList.remove('active');
+                        sw.classList.remove('active');
+                        if (typeof showToast === 'function') {
+                            showToast('Auto AI Scoring OFF', 'success', 3000);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[AUTO-AI] Toggle failed:', err);
+                if (typeof showToast === 'function') {
+                    showToast('Failed to toggle Auto AI Scoring', 'error', 4000);
+                }
+            }
+        }
+
+        async function triggerAutoAiScoringForAll() {
+            if (!autoAiScoringEnabled || !aiScoringEnabled) return;
+            for (const panel of panels) {
+                if (!autoAiScoringEnabled) break; // stop if toggled off mid-run
+                if (panel.dataset.scored === '0') {
+                    const subId = parseInt(panel.dataset.submissionId);
+                    if (!aiScoredSubmissions.has(subId) && !aiThinkingSubmissions.has(subId)) {
+                        await scoreWithAIQuiet(subId, maxAnswers);
+                    }
+                }
+            }
+        }
+
+        async function scoreWithAIQuiet(submissionId, numAnswers) {
+            // Same as scoreWithAI() but skips the blank-answer confirm dialog (for auto mode)
+            console.log(`[AUTO-AI] Auto-scoring submission ${submissionId}`);
+
+            aiThinkingSubmissions.add(submissionId);
+            updateNavBar();
+
+            try {
+                const response = await fetch(`/host/ai-score/${submissionId}`, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error('[AUTO-AI] API error:', data.error);
+                    aiThinkingSubmissions.delete(submissionId);
+                    updateNavBar();
+                    return;
+                }
+
+                const form = document.getElementById(`form-${submissionId}`);
+                const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+
+                const derivedMatches = new Set();
+                (data.reasoning || []).forEach(entry => {
+                    if (entry.matched_to !== null && entry.matched_to !== undefined) {
+                        derivedMatches.add(entry.matched_to);
+                    }
+                });
+
+                checkboxes.forEach(cb => {
+                    cb.checked = false;
+                    const row = cb.closest('.checkbox-row');
+                    if (row) row.classList.remove('checked');
+                });
+
+                derivedMatches.forEach(answerNum => {
+                    const cb = form.querySelector(`input[name="answer_${answerNum}"]`);
+                    if (cb) {
+                        cb.checked = true;
+                        const row = cb.closest('.checkbox-row');
+                        if (row) row.classList.add('checked');
+                    }
+                });
+
+                const matchesInput = form.querySelector(`#ai-matches-${submissionId}`);
+                const reasoningInput = form.querySelector(`#ai-reasoning-data-${submissionId}`);
+                if (matchesInput) matchesInput.value = Array.from(derivedMatches).join(',');
+                if (reasoningInput) reasoningInput.value = JSON.stringify(data.reasoning || []);
+
+                updateScore(submissionId, numAnswers);
+                aiScoredSubmissions.add(submissionId);
+                aiThinkingSubmissions.delete(submissionId);
+                buildAINotes(submissionId, data.reasoning || []);
+
+                const toggleBtn = document.getElementById(`toggleNotes-${submissionId}`);
+                if (toggleBtn) toggleBtn.style.display = 'inline-block';
+
+                updateNavBar();
+                console.log(`[AUTO-AI] Done: submission ${submissionId}, ${derivedMatches.size} matches`);
+
+            } catch (err) {
+                console.error('[AUTO-AI] Network error for submission', submissionId, err);
+                aiThinkingSubmissions.delete(submissionId);
+                updateNavBar();
+            }
+        }
+
         // ==================== INITIALIZATION ====================
         document.addEventListener('DOMContentLoaded', function() {
             if (totalTeams > 0) {
@@ -1650,10 +1847,39 @@
                     const subId = panel.dataset.submissionId;
                     updateScore(parseInt(subId), maxAnswers);
                 });
+
+                // Restore AI scoring state from stored DB results
+                panels.forEach(panel => {
+                    const subId = parseInt(panel.dataset.submissionId);
+                    const storedMatches = panel.dataset.aiMatches;
+                    const storedReasoning = panel.dataset.aiReasoning;
+                    if (storedMatches && storedMatches.trim()) {
+                        aiScoredSubmissions.add(subId);
+                        // Build AI notes from stored reasoning
+                        if (storedReasoning && storedReasoning.trim()) {
+                            try {
+                                const reasoning = JSON.parse(storedReasoning);
+                                buildAINotes(subId, reasoning);
+                                const toggleBtn = document.getElementById(`toggleNotes-${subId}`);
+                                if (toggleBtn) toggleBtn.style.display = 'inline-block';
+                            } catch (e) {
+                                console.warn(`[AUTO-AI] Failed to parse stored reasoning for submission ${subId}:`, e);
+                            }
+                        }
+                    }
+                });
             }
 
             // Start polling
             updateUnscoredCount();
+
+            // Auto AI Scoring: catch-up for any unscored submissions not yet AI-scored
+            // (e.g. submissions that arrived before auto-score was enabled)
+            if (autoAiScoringEnabled && aiScoringEnabled) {
+                setTimeout(() => {
+                    triggerAutoAiScoringForAll();
+                }, 500);
+            }
         });
     </script>
 
