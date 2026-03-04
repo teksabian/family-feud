@@ -145,10 +145,16 @@ AI_MODEL_CHOICES = [m for m in _ALL_MODEL_CHOICES
                     if (m['provider'] == 'anthropic' and ANTHROPIC_READY)
                     or (m['provider'] == 'openai' and OPENAI_READY)]
 
-# Default OCR model: env var > Claude Sonnet (best vision) > GPT-4o > none
+# Model env vars: specific > legacy AI_MODEL > hardcoded default
 _env_ocr_model = os.environ.get('AI_OCR_MODEL', '')
+_env_scoring_model = os.environ.get('AI_SCORING_MODEL', '')
+_env_legacy_model = os.environ.get('AI_MODEL', '')
+
+# Default OCR model: specific env > legacy env > Claude Sonnet (best vision) > GPT-4o > none
 if _env_ocr_model:
     AI_OCR_MODEL_DEFAULT = _env_ocr_model
+elif _env_legacy_model:
+    AI_OCR_MODEL_DEFAULT = _env_legacy_model
 elif ANTHROPIC_READY:
     AI_OCR_MODEL_DEFAULT = 'claude-sonnet-4-20250514'
 elif OPENAI_READY:
@@ -157,10 +163,11 @@ else:
     AI_OCR_MODEL_DEFAULT = ''
 logger.info(f"AI OCR Model default: {AI_OCR_MODEL_DEFAULT}")
 
-# Default scoring model: env var > GPT-5.2 (strong reasoning) > Claude Sonnet > none
-_env_scoring_model = os.environ.get('AI_SCORING_MODEL', '')
+# Default scoring model: specific env > legacy env > GPT-5.2 (strong reasoning) > Claude Sonnet > none
 if _env_scoring_model:
     AI_SCORING_MODEL_DEFAULT = _env_scoring_model
+elif _env_legacy_model:
+    AI_SCORING_MODEL_DEFAULT = _env_legacy_model
 elif OPENAI_READY:
     AI_SCORING_MODEL_DEFAULT = 'gpt-5.2'
 elif ANTHROPIC_READY:
