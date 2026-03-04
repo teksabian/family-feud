@@ -1288,15 +1288,6 @@
                         refreshBtn.style.background = '#333';
                         refreshBtn.style.color = '#fff';
                     }
-
-                    // Auto AI Scoring: reload page when new submissions arrive
-                    if (autoAiScoringEnabled && aiScoringEnabled && data.count > lastKnownUnscoredCount) {
-                        console.log(`[AUTO-AI] New submissions detected (${lastKnownUnscoredCount} -> ${data.count}). Reloading...`);
-                        if (!unsavedChanges) {
-                            window.location.reload();
-                            return;
-                        }
-                    }
                     lastKnownUnscoredCount = data.count;
                 }
 
