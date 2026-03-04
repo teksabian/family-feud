@@ -711,10 +711,10 @@
             <div>
                 {% if active_round %}
                 <div class="card active-round">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">
-                        <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">🎯 Round {{ active_round.round_number }} - ACTIVE</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 3px solid #ffd700; padding-bottom: 10px;">
+                        <h2 style="margin: 0; border: none; padding: 0;">🎯 Round {{ active_round.round_number }} - ACTIVE</h2>
                         {% if active_round.answer1 %}
-                        <button id="toggleAnswersBtn" onclick="toggleAnswers()" style="padding: 10px 20px; background: #ffd700; color: #000; border: 2px solid #ffd700; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-family: inherit; font-size: 1em; white-space: nowrap;">
+                        <button id="toggleAnswersBtn" onclick="toggleAnswers()" style="padding: 8px 16px; background: #ffd700; color: #000; border: 2px solid #ffd700; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-family: inherit; font-size: 0.85em; white-space: nowrap;">
                             👁️ SHOW ANSWERS
                         </button>
                         {% endif %}
