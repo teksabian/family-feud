@@ -14,7 +14,7 @@ from config import (
     logger,
     ANTHROPIC_AVAILABLE, ANTHROPIC_API_KEY, ANTHROPIC_READY,
     OPENAI_AVAILABLE, OPENAI_API_KEY, OPENAI_READY,
-    AI_SCORING_ENABLED, AI_MODEL_DEFAULT, AI_MODEL_CHOICES,
+    AI_SCORING_ENABLED, AI_OCR_MODEL_DEFAULT, AI_SCORING_MODEL_DEFAULT, AI_MODEL_CHOICES,
     CORRECTIONS_FILE,
     PHOTO_SCAN_PROMPT, PHOTO_SCAN_SINGLE_PROMPT,
 )
@@ -67,18 +67,32 @@ if AI_SCORING_ENABLED:
 
 # ============= AI HELPERS =============
 
-def get_current_ai_model():
-    """Get the current AI model to use.
-    Priority: database setting > AI_MODEL env var > hardcoded default.
+def get_current_ocr_model():
+    """Get the AI model for OCR / photo scanning.
+    Priority: database setting > AI_OCR_MODEL env var > hardcoded default.
     """
-    db_value = get_setting('ai_model', '')
+    db_value = get_setting('ai_ocr_model', '')
     if db_value:
         valid_ids = [m['id'] for m in AI_MODEL_CHOICES]
         if db_value in valid_ids:
             return db_value
         else:
-            logger.warning(f"[AI] Unknown model in database: '{db_value}', falling back to default")
-    return AI_MODEL_DEFAULT
+            logger.warning(f"[AI] Unknown OCR model in database: '{db_value}', falling back to default")
+    return AI_OCR_MODEL_DEFAULT
+
+
+def get_current_scoring_model():
+    """Get the AI model for answer scoring.
+    Priority: database setting > AI_SCORING_MODEL env var > hardcoded default.
+    """
+    db_value = get_setting('ai_scoring_model', '')
+    if db_value:
+        valid_ids = [m['id'] for m in AI_MODEL_CHOICES]
+        if db_value in valid_ids:
+            return db_value
+        else:
+            logger.warning(f"[AI] Unknown scoring model in database: '{db_value}', falling back to default")
+    return AI_SCORING_MODEL_DEFAULT
 
 def build_claude_api_kwargs(max_tokens_default):
     """Build keyword arguments for client.messages.create() based on current settings.
@@ -220,7 +234,7 @@ def extract_single_scorecard(image_b64):
         return None
 
     try:
-        current_model = get_current_ai_model()
+        current_model = get_current_ocr_model()
         provider = get_provider_for_model(current_model)
         logger.info(f"[PHOTO-SCAN] Single scorecard extraction (model: {current_model}, provider: {provider}, image size: {len(image_b64)} chars base64)")
 
@@ -323,7 +337,7 @@ def extract_answers_from_photo(image_b64):
         return []
 
     try:
-        current_model = get_current_ai_model()
+        current_model = get_current_ocr_model()
         provider = get_provider_for_model(current_model)
         logger.info(f"[PHOTO-SCAN] Calling Vision API (model: {current_model}, provider: {provider}, image size: {len(image_b64)} chars base64)")
 
@@ -506,7 +520,7 @@ Respond with ONLY a JSON object in this exact format:
 If no matches at all, return: {"matches": [], "reasoning": [...]}"""
 
     try:
-        current_model = get_current_ai_model()
+        current_model = get_current_scoring_model()
         provider = get_provider_for_model(current_model)
         logger.debug(f"[AI-SCORING] Calling {provider} API (model: {current_model}, prompt length: {len(prompt)} chars)")
 

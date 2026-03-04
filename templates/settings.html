@@ -468,11 +468,16 @@
             </div>
 
             <!-- AI Model Selection -->
+            {% set anthropic_models = ai_model_choices|selectattr('provider', 'equalto', 'anthropic')|list %}
+            {% set openai_models = ai_model_choices|selectattr('provider', 'equalto', 'openai')|list %}
+
+            <!-- Answer Sheet OCR Model -->
             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                 <form method="POST" action="{{ url_for('host.set_ai_model') }}?v={{ cache_bust }}">
+                    <input type="hidden" name="purpose" value="ocr">
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label for="ai_model">AI Model</label>
-                        <select name="ai_model" id="ai_model"
+                        <label for="ai_ocr_model">Answer Sheet OCR Model</label>
+                        <select name="ai_model" id="ai_ocr_model"
                                 style="width: 100%; padding: 12px 15px; font-size: 1em;
                                        border: 2px solid #1e3c72; border-radius: 8px;
                                        background: rgba(255,255,255,0.1); color: #fff;
@@ -483,13 +488,11 @@
                                        background-position: right 12px center;
                                        background-size: 20px;"
                                 onchange="this.closest('form').submit()">
-                            {% set anthropic_models = ai_model_choices|selectattr('provider', 'equalto', 'anthropic')|list %}
-                            {% set openai_models = ai_model_choices|selectattr('provider', 'equalto', 'openai')|list %}
                             {% if anthropic_models %}
                             <optgroup label="Anthropic Claude" style="background: #1a1a2e; color: #fff;">
                                 {% for model in anthropic_models %}
                                 <option value="{{ model.id }}"
-                                        {% if model.id == current_ai_model %}selected{% endif %}
+                                        {% if model.id == current_ocr_model %}selected{% endif %}
                                         style="background: #1a1a2e; color: #fff;">
                                     {{ model.name }} - {{ model.description }}
                                 </option>
@@ -500,7 +503,7 @@
                             <optgroup label="OpenAI" style="background: #1a1a2e; color: #fff;">
                                 {% for model in openai_models %}
                                 <option value="{{ model.id }}"
-                                        {% if model.id == current_ai_model %}selected{% endif %}
+                                        {% if model.id == current_ocr_model %}selected{% endif %}
                                         style="background: #1a1a2e; color: #fff;">
                                     {{ model.name }} - {{ model.description }}
                                 </option>
@@ -510,28 +513,75 @@
                         </select>
                     </div>
                 </form>
-
                 <div class="help-text">
                     {% for model in ai_model_choices %}
-                        {% if model.id == current_ai_model %}
-                        Using <strong>{{ model.name }}</strong> ({{ model.cost_note }})
+                        {% if model.id == current_ocr_model %}
+                        Using <strong>{{ model.name }}</strong> for photo scanning ({{ model.cost_note }})
                         {% endif %}
-                    {% endfor %}
-                </div>
-                <div class="help-text" style="margin-top: 5px; font-size: 0.85em;">
-                    {% for model in ai_model_choices %}
-                        {{ model.name }}: {{ model.cost_note }}{% if not loop.last %} · {% endif %}
                     {% endfor %}
                 </div>
             </div>
 
-            <!-- Extended Thinking Toggle (Anthropic models only) -->
-            {% set current_provider = namespace(val='anthropic') %}
-            {% for model in ai_model_choices if model.id == current_ai_model %}
-                {% set current_provider.val = model.provider %}
+            <!-- AI Scoring Model -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <form method="POST" action="{{ url_for('host.set_ai_model') }}?v={{ cache_bust }}">
+                    <input type="hidden" name="purpose" value="scoring">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label for="ai_scoring_model">AI Scoring Model</label>
+                        <select name="ai_model" id="ai_scoring_model"
+                                style="width: 100%; padding: 12px 15px; font-size: 1em;
+                                       border: 2px solid #1e3c72; border-radius: 8px;
+                                       background: rgba(255,255,255,0.1); color: #fff;
+                                       cursor: pointer; appearance: none;
+                                       -webkit-appearance: none;
+                                       background-image: url('data:image/svg+xml;utf8,<svg fill=&quot;white&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><path d=&quot;M7 10l5 5 5-5z&quot;/></svg>');
+                                       background-repeat: no-repeat;
+                                       background-position: right 12px center;
+                                       background-size: 20px;"
+                                onchange="this.closest('form').submit()">
+                            {% if anthropic_models %}
+                            <optgroup label="Anthropic Claude" style="background: #1a1a2e; color: #fff;">
+                                {% for model in anthropic_models %}
+                                <option value="{{ model.id }}"
+                                        {% if model.id == current_scoring_model %}selected{% endif %}
+                                        style="background: #1a1a2e; color: #fff;">
+                                    {{ model.name }} - {{ model.description }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                            {% if openai_models %}
+                            <optgroup label="OpenAI" style="background: #1a1a2e; color: #fff;">
+                                {% for model in openai_models %}
+                                <option value="{{ model.id }}"
+                                        {% if model.id == current_scoring_model %}selected{% endif %}
+                                        style="background: #1a1a2e; color: #fff;">
+                                    {{ model.name }} - {{ model.description }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                        </select>
+                    </div>
+                </form>
+                <div class="help-text">
+                    {% for model in ai_model_choices %}
+                        {% if model.id == current_scoring_model %}
+                        Using <strong>{{ model.name }}</strong> for scoring ({{ model.cost_note }})
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Extended Thinking Toggle (shown when any Anthropic model is selected) -->
+            {% set has_anthropic = namespace(val=false) %}
+            {% for model in ai_model_choices if model.provider == 'anthropic' %}
+                {% if model.id == current_ocr_model or model.id == current_scoring_model %}
+                    {% set has_anthropic.val = true %}
+                {% endif %}
             {% endfor %}
 
-            {% if current_provider.val == 'anthropic' %}
+            {% if has_anthropic.val %}
             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                 <form method="POST" action="{{ url_for('host.toggle_setting') }}?v={{ cache_bust }}">
                     <input type="hidden" name="setting_key" value="extended_thinking_enabled">

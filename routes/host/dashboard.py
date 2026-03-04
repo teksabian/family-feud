@@ -17,7 +17,8 @@ from database import (
 )
 from ai import (
     load_corrections_history,
-    get_current_ai_model,
+    get_current_ocr_model,
+    get_current_scoring_model,
 )
 
 from routes.host import host_bp, ROUNDS_CONFIG
@@ -140,7 +141,8 @@ def settings():
                          ai_scoring_enabled=ai_scoring_enabled,
                          corrections_count=corrections_count,
                          ai_model_choices=AI_MODEL_CHOICES,
-                         current_ai_model=get_current_ai_model(),
+                         current_ocr_model=get_current_ocr_model(),
+                         current_scoring_model=get_current_scoring_model(),
                          extended_thinking_enabled=extended_thinking_enabled,
                          thinking_budget_tokens=thinking_budget_tokens)
 
@@ -188,19 +190,30 @@ def toggle_setting():
 @host_bp.route('/host/set-ai-model', methods=['POST'])
 @host_required
 def set_ai_model():
-    """Set the AI model for scoring and photo scanning"""
+    """Set an AI model for OCR or scoring"""
     model_id = request.form.get('ai_model', '').strip()
+    purpose = request.form.get('purpose', '').strip()
 
     valid_ids = [m['id'] for m in AI_MODEL_CHOICES]
     if model_id not in valid_ids:
         flash('Invalid model selection.', 'error')
         return redirect(url_for('.settings'))
 
-    set_setting('ai_model', model_id, 'AI model for scoring and photo scan')
+    if purpose == 'ocr':
+        setting_key = 'ai_ocr_model'
+        label = 'OCR'
+    elif purpose == 'scoring':
+        setting_key = 'ai_scoring_model'
+        label = 'Scoring'
+    else:
+        flash('Invalid model purpose.', 'error')
+        return redirect(url_for('.settings'))
+
+    set_setting(setting_key, model_id, f'AI model for {label.lower()}')
 
     model_name = next((m['name'] for m in AI_MODEL_CHOICES if m['id'] == model_id), model_id)
-    logger.info(f"[SETTINGS] AI model changed to: {model_id}")
-    flash(f'AI Model set to {model_name}', 'success')
+    logger.info(f"[SETTINGS] AI {label} model changed to: {model_id}")
+    flash(f'{label} Model set to {model_name}', 'success')
 
     return redirect(url_for('.settings'))
 

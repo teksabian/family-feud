@@ -145,17 +145,29 @@ AI_MODEL_CHOICES = [m for m in _ALL_MODEL_CHOICES
                     if (m['provider'] == 'anthropic' and ANTHROPIC_READY)
                     or (m['provider'] == 'openai' and OPENAI_READY)]
 
-# Default model: env var > first available Anthropic > first available OpenAI
-_env_model = os.environ.get('AI_MODEL', '')
-if _env_model:
-    AI_MODEL_DEFAULT = _env_model
+# Default OCR model: env var > Claude Sonnet (best vision) > GPT-4o > none
+_env_ocr_model = os.environ.get('AI_OCR_MODEL', '')
+if _env_ocr_model:
+    AI_OCR_MODEL_DEFAULT = _env_ocr_model
 elif ANTHROPIC_READY:
-    AI_MODEL_DEFAULT = 'claude-sonnet-4-20250514'
+    AI_OCR_MODEL_DEFAULT = 'claude-sonnet-4-20250514'
 elif OPENAI_READY:
-    AI_MODEL_DEFAULT = 'gpt-5.2'
+    AI_OCR_MODEL_DEFAULT = 'gpt-4o'
 else:
-    AI_MODEL_DEFAULT = ''
-logger.info(f"AI Model default: {AI_MODEL_DEFAULT}")
+    AI_OCR_MODEL_DEFAULT = ''
+logger.info(f"AI OCR Model default: {AI_OCR_MODEL_DEFAULT}")
+
+# Default scoring model: env var > GPT-5.2 (strong reasoning) > Claude Sonnet > none
+_env_scoring_model = os.environ.get('AI_SCORING_MODEL', '')
+if _env_scoring_model:
+    AI_SCORING_MODEL_DEFAULT = _env_scoring_model
+elif OPENAI_READY:
+    AI_SCORING_MODEL_DEFAULT = 'gpt-5.2'
+elif ANTHROPIC_READY:
+    AI_SCORING_MODEL_DEFAULT = 'claude-sonnet-4-20250514'
+else:
+    AI_SCORING_MODEL_DEFAULT = ''
+logger.info(f"AI Scoring Model default: {AI_SCORING_MODEL_DEFAULT}")
 
 # ===== GITHUB API =====
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')

@@ -215,13 +215,34 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: photo_path column added")
 
+        # Migration: Split ai_model into ai_ocr_model and ai_scoring_model
+        existing_ai_model = conn.execute(
+            "SELECT value FROM settings WHERE key = 'ai_model'"
+        ).fetchone()
+        if existing_ai_model and existing_ai_model['value']:
+            old_model = existing_ai_model['value']
+            for new_key in ('ai_ocr_model', 'ai_scoring_model'):
+                existing_new = conn.execute(
+                    "SELECT value FROM settings WHERE key = ?", (new_key,)
+                ).fetchone()
+                if not existing_new or not existing_new['value']:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO settings (key, value, description, updated_at) "
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                        (new_key, old_model,
+                         'AI model for OCR' if 'ocr' in new_key else 'AI model for scoring')
+                    )
+                    logger.info(f"[MIGRATION] Migrated ai_model='{old_model}' -> {new_key}")
+            conn.commit()
+
         # Initialize default settings if they don't exist
         default_settings = [
             ('allow_team_registration', 'true', 'Allow new teams to join'),
             ('system_paused', 'false', 'System pause status'),
             ('broadcast_message', '', 'Broadcast message to all teams'),
             ('server_sleep', 'false', 'Server sleep mode - stops auto-refresh'),
-            ('ai_model', '', 'AI model for scoring and photo scan'),
+            ('ai_ocr_model', '', 'AI model for photo scanning / OCR'),
+            ('ai_scoring_model', '', 'AI model for answer scoring'),
             ('extended_thinking_enabled', 'false', 'Enable extended thinking for AI calls'),
             ('thinking_budget_tokens', '10000', 'Token budget for extended thinking'),
         ]
