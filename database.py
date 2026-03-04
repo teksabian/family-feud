@@ -215,6 +215,23 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: photo_path column added")
 
+        # Migration: Add ai_matches and ai_reasoning columns to submissions table (auto AI scoring)
+        try:
+            conn.execute("SELECT ai_matches FROM submissions LIMIT 1")
+        except:
+            logger.info("Adding ai_matches column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN ai_matches TEXT DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: ai_matches column added")
+
+        try:
+            conn.execute("SELECT ai_reasoning FROM submissions LIMIT 1")
+        except:
+            logger.info("Adding ai_reasoning column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN ai_reasoning TEXT DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: ai_reasoning column added")
+
         # Migration: Split ai_model into ai_ocr_model and ai_scoring_model
         existing_ai_model = conn.execute(
             "SELECT value FROM settings WHERE key = 'ai_model'"

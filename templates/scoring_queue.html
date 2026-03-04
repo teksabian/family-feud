@@ -866,7 +866,9 @@
              data-team-name="{{ sub.team_name if sub.team_name else '[Deleted Team]' }}"
              data-team-code="{{ sub.code }}"
              data-submitted-time="{{ sub.submitted_time }}"
-             data-score="{{ sub.score }}">
+             data-score="{{ sub.score }}"
+             data-ai-matches="{{ sub.ai_matches or '' }}"
+             data-ai-reasoning="{{ sub.ai_reasoning or '' }}">
 
             <!-- Main Scoring Area: 32% left / 68% right -->
             <div class="scoring-area" id="scoringArea-{{ sub.id }}">
@@ -925,8 +927,8 @@
                     <form method="POST" action="{{ url_for('scoring.score_team', submission_id=sub.id) }}"
                           onsubmit="return submitScoreAjax(event, this, {{ sub.id }})"
                           id="form-{{ sub.id }}">
-                        <input type="hidden" name="ai_matches" id="ai-matches-{{ sub.id }}" value="">
-                        <input type="hidden" name="ai_reasoning" id="ai-reasoning-data-{{ sub.id }}" value="">
+                        <input type="hidden" name="ai_matches" id="ai-matches-{{ sub.id }}" value="{{ sub.ai_matches or '' }}">
+                        <input type="hidden" name="ai_reasoning" id="ai-reasoning-data-{{ sub.id }}" value="{{ sub.ai_reasoning|e if sub.ai_reasoning else '' }}">
 
                         <div class="right-panel-header">
                             <h3>Award Points For</h3>
@@ -1854,15 +1856,36 @@
                     const subId = panel.dataset.submissionId;
                     updateScore(parseInt(subId), maxAnswers);
                 });
+
+                // Restore AI scoring state from stored DB results
+                panels.forEach(panel => {
+                    const subId = parseInt(panel.dataset.submissionId);
+                    const storedMatches = panel.dataset.aiMatches;
+                    const storedReasoning = panel.dataset.aiReasoning;
+                    if (storedMatches && storedMatches.trim()) {
+                        aiScoredSubmissions.add(subId);
+                        // Build AI notes from stored reasoning
+                        if (storedReasoning && storedReasoning.trim()) {
+                            try {
+                                const reasoning = JSON.parse(storedReasoning);
+                                buildAINotes(subId, reasoning);
+                                const toggleBtn = document.getElementById(`toggleNotes-${subId}`);
+                                if (toggleBtn) toggleBtn.style.display = 'inline-block';
+                            } catch (e) {
+                                console.warn(`[AUTO-AI] Failed to parse stored reasoning for submission ${subId}:`, e);
+                            }
+                        }
+                    }
+                });
             }
 
             // Start polling
             updateUnscoredCount();
 
-            // Auto AI Scoring: trigger for all unscored submissions on page load
+            // Auto AI Scoring: catch-up for any unscored submissions not yet AI-scored
+            // (e.g. submissions that arrived before auto-score was enabled)
             if (autoAiScoringEnabled && aiScoringEnabled) {
                 setTimeout(() => {
-                    console.log('[AUTO-AI] Auto-scoring enabled on page load - scoring all unscored submissions');
                     triggerAutoAiScoringForAll();
                 }, 500);
             }

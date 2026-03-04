@@ -6,9 +6,10 @@ play page, answer submission, view page, and terms page.
 """
 
 import sqlite3
+import threading
 from flask import Blueprint, request, render_template, redirect, url_for, session, flash
 
-from config import logger, STARTUP_ID, reset_state
+from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED
 from auth import team_session_valid
 from database import db_connect, get_setting
 
@@ -374,6 +375,24 @@ def submit_answers():
             conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
             conn.commit()
             logger.info(f"[TEAM] submit_answers() - submission saved for code={code}, round_id={round_id}, tiebreaker={tiebreaker}, answers={answers}")
+
+            # Auto AI Scoring: trigger in background thread if enabled
+            if AI_SCORING_ENABLED and get_setting('ai_scoring_enabled', 'true') == 'true' and get_setting('auto_ai_scoring', 'false') == 'true':
+                sub_row = conn.execute(
+                    "SELECT id FROM submissions WHERE code = ? AND round_id = ?",
+                    (code, round_id)
+                ).fetchone()
+                if sub_row:
+                    sub_id = sub_row['id']
+                    logger.info(f"[AUTO-AI] Triggering background AI scoring for submission {sub_id}")
+                    def _background_ai_score(sid):
+                        try:
+                            from routes.scoring import run_ai_scoring_for_submission
+                            run_ai_scoring_for_submission(sid)
+                        except Exception as e:
+                            logger.error(f"[AUTO-AI] Background scoring failed for submission {sid}: {e}", exc_info=True)
+                    thread = threading.Thread(target=_background_ai_score, args=(sub_id,), daemon=True)
+                    thread.start()
 
             # Store submission for answer preview
             session['last_submission'] = {
