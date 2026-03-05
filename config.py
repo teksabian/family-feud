@@ -213,7 +213,7 @@ THEMES = {
         'name':           'Classic',
         'font_url':       '',
         'font_family':    "'Arial Black', Arial, sans-serif",
-        'bg_gradient':    'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+        'bg_gradient':    'linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%)',
         'bg_color':       '#000000',
         'accent':         '#ffd700',
         'card_border':    '#1e3c72',
