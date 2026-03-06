@@ -367,8 +367,8 @@
         }
         
         .code-item.used {
-            background: rgba(40,167,69,0.2);
-            border-color: #28a745;
+            background: color-mix(in srgb, var(--success) 20%, transparent);
+            border-color: var(--success);
             opacity: 1;
         }
         
@@ -509,7 +509,7 @@
         .toast.success {
             background: #d4edda;
             color: #155724;
-            border-left-color: #28a745;
+            border-left-color: var(--success);
         }
         
         .toast.error {
@@ -587,8 +587,8 @@
         }
         
         .toast.success {
-            border-left-color: #28a745;
-            background: linear-gradient(135deg, rgba(40,167,69,0.2) 0%, rgba(50,50,50,1) 50%);
+            border-left-color: var(--success);
+            background: linear-gradient(135deg, color-mix(in srgb, var(--success) 20%, transparent) 0%, rgba(50,50,50,1) 50%);
         }
         
         .toast.error {
@@ -758,7 +758,7 @@
                     
                     {% if active_round.answer1 %}
                     <!-- Answers exist - show locked with edit icons -->
-                    <h3 style="color: #28a745; margin-bottom: 15px;">
+                    <h3 style="color: var(--success); margin-bottom: 15px;">
                         ✅ Correct Answers (Locked)
                     </h3>
                     
@@ -768,9 +768,9 @@
                     
                     <div class="answers-locked">
                         {% for i in range(1, active_round.num_answers + 1) %}
-                        <div style="display: flex; align-items: center; padding: 15px; background: rgba(40,167,69,0.2); border-radius: 8px; margin-bottom: 10px; border: 2px solid #28a745;">
+                        <div style="display: flex; align-items: center; padding: 15px; background: color-mix(in srgb, var(--success) 20%, transparent); border-radius: 8px; margin-bottom: 10px; border: 2px solid var(--success);">
                             <div style="flex: 1;">
-                                <strong style="color: #28a745; margin-right: 10px; font-size: 1.2em;">#{{ i }}</strong>
+                                <strong style="color: var(--success); margin-right: 10px; font-size: 1.2em;">#{{ i }}</strong>
                                 <span style="color: #fff; font-size: 1.2em;">{{ active_round['answer' ~ i] }}</span>
                                 {% if i == 1 and active_round.answer1_count %}
                                 <span style="color: #ffd700; margin-left: 15px; font-size: 1.1em;">({{ active_round.answer1_count }} people)</span>
@@ -860,7 +860,7 @@
                         <h3 style="color: #dc3545; margin-bottom: 10px;">🔒 Round Closed</h3>
                         <p style="color: #fff; margin-bottom: 15px;">Submissions are closed for this round. Ready to score!</p>
                         <a href="{{ url_for('scoring.scoring_queue') }}?v={{ cache_bust }}" style="text-decoration: none;">
-                            <button type="button" style="width: 100%; padding: 15px; font-size: 1.2em; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                            <button type="button" style="width: 100%; padding: 15px; font-size: 1.2em; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
                                 🎯 Go to Scoring Queue
                             </button>
                         </a>
@@ -971,22 +971,22 @@
                                 👁️ Mobile View Only
                             </button>
                         </a>
-                        <button type="button" class="btn-block" style="background: #28a745;" onclick="showAnswerSheetPicker()">
+                        <button type="button" class="btn-block" style="background: var(--success);" onclick="showAnswerSheetPicker()">
                             📝 Answer Sheets
                         </button>
                     </div>
 
                     <!-- Answer Sheet Group Picker Modal -->
-                    <div id="answerSheetPicker" style="display: none; margin-top: 15px; padding: 15px; background: rgba(40,167,69,0.15); border: 2px solid #28a745; border-radius: 10px;">
+                    <div id="answerSheetPicker" style="display: none; margin-top: 15px; padding: 15px; background: color-mix(in srgb, var(--success) 15%, transparent); border: 2px solid var(--success); border-radius: 10px;">
                         <p style="color: #fff; font-weight: bold; margin-bottom: 10px;">Select Answer Sheet Group:</p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <a href="{{ url_for('host.print_answer_sheets') }}?group=1&v={{ cache_bust }}" target="_blank">
-                                <button type="button" class="btn-block" style="background: #28a745;">
+                                <button type="button" class="btn-block" style="background: var(--success);">
                                     📝 Group 1 (1-30)
                                 </button>
                             </a>
                             <a href="{{ url_for('host.print_answer_sheets') }}?group=2&v={{ cache_bust }}" target="_blank">
-                                <button type="button" class="btn-block" style="background: #28a745;">
+                                <button type="button" class="btn-block" style="background: var(--success);">
                                     📝 Group 2 (31-60)
                                 </button>
                             </a>
@@ -1173,18 +1173,18 @@
                         </a>
                     </div>
                     
-                    <div style="background: rgba(40,167,69,0.1); padding: 20px; border-radius: 8px; border: 2px solid #28a745;">
-                        <h3 style="color: #28a745; margin-bottom: 10px;">📄 Upload Answer Sheet</h3>
+                    <div style="background: color-mix(in srgb, var(--success) 10%, transparent); padding: 20px; border-radius: 8px; border: 2px solid var(--success);">
+                        <h3 style="color: var(--success); margin-bottom: 10px;">📄 Upload Answer Sheet</h3>
                         <p style="color: rgba(255,255,255,0.7); margin-bottom: 15px; font-size: 0.95em;">
                             Upload DOCX or PowerPoint (PPTX/PPTM) to create all 8 rounds at once
                         </p>
                         <form method="POST" action="{{ url_for('host.upload_answers') }}?v={{ cache_bust }}" enctype="multipart/form-data" id="uploadForm" onsubmit="showUploadSpinner()">
-                            <input type="file" name="file" accept=".docx,.pptx,.pptm" required style="margin-bottom: 15px; width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #ffd700; border: 2px solid #28a745; border-radius: 8px;">
-                            <button type="submit" class="btn-block" id="uploadBtn" style="background: #28a745;">
+                            <input type="file" name="file" accept=".docx,.pptx,.pptm" required style="margin-bottom: 15px; width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #ffd700; border: 2px solid var(--success); border-radius: 8px;">
+                            <button type="submit" class="btn-block" id="uploadBtn" style="background: var(--success);">
                                 📤 Upload & Create All Rounds
                             </button>
-                            <div id="uploadSpinner" style="display: none; text-align: center; margin-top: 15px; color: #28a745;">
-                                <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(40,167,69,0.3); border-top-color: #28a745; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <div id="uploadSpinner" style="display: none; text-align: center; margin-top: 15px; color: var(--success);">
+                                <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid color-mix(in srgb, var(--success) 30%, transparent); border-top-color: var(--success); border-radius: 50%; animation: spin 1s linear infinite;"></div>
                                 <p style="margin-top: 10px; font-weight: bold;">📤 Uploading and parsing file...</p>
                                 <p style="font-size: 0.9em; opacity: 0.8;">This may take a few seconds...</p>
                             </div>
@@ -1196,7 +1196,7 @@
                                 document.getElementById('uploadSpinner').style.display = 'block';
                             }
                         </script>
-                        <div style="margin-top: 15px; padding: 12px; background: rgba(40,167,69,0.2); border: 1px solid #28a745; border-radius: 6px; color: #fff; font-size: 0.9em;">
+                        <div style="margin-top: 15px; padding: 12px; background: color-mix(in srgb, var(--success) 20%, transparent); border: 1px solid var(--success); border-radius: 6px; color: #fff; font-size: 0.9em;">
                             💡 <strong>Note:</strong> Upload creates all 8 rounds with questions & answers!
                         </div>
                     </div>
@@ -1268,7 +1268,7 @@
                     <!-- Global Question Toggle (only show when rounds exist) -->
                     {% if rounds %}
                     <div style="margin-bottom: 20px;">
-                        <button id="globalQuestionToggle" onclick="toggleAllQuestions()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95em; font-weight: bold;">
+                        <button id="globalQuestionToggle" onclick="toggleAllQuestions()" style="padding: 10px 20px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95em; font-weight: bold;">
                             👁️ SHOW ALL QUESTIONS
                         </button>
                         <p style="color: rgba(255,255,255,0.6); font-size: 0.85em; margin-top: 8px;">
@@ -1292,7 +1292,7 @@
                                 <span class="question-text" data-round="{{ round.id }}" data-original="{{ round.question }}">
                                     <!-- Question will be populated by JavaScript -->
                                 </span>
-                                <button onclick="toggleQuestion({{ round.id }})" class="question-toggle-btn" data-round="{{ round.id }}" style="padding: 4px 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">
+                                <button onclick="toggleQuestion({{ round.id }})" class="question-toggle-btn" data-round="{{ round.id }}" style="padding: 4px 10px; background: var(--success); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">
                                     👁️ SHOW
                                 </button>
                             </div>
@@ -1353,7 +1353,7 @@
                                 // Hide question
                                 element.textContent = rot13(originalText);
                                 button.textContent = '👁️ SHOW';
-                                button.style.background = '#28a745';
+                                button.style.background = 'var(--success)';
                             }
                             
                             updateGlobalButton();
@@ -1381,7 +1381,7 @@
                                     // Hide
                                     element.textContent = rot13(originalText);
                                     button.textContent = '👁️ SHOW';
-                                    button.style.background = '#28a745';
+                                    button.style.background = 'var(--success)';
                                 }
                             });
                             
@@ -1400,7 +1400,7 @@
                                 globalButton.style.background = '#dc3545';
                             } else {
                                 globalButton.textContent = '👁️ SHOW ALL QUESTIONS';
-                                globalButton.style.background = '#28a745';
+                                globalButton.style.background = 'var(--success)';
                             }
                         }
                     </script>
@@ -1553,7 +1553,7 @@
                     
                     // Update dot color and tooltip
                     if (team.is_online) {
-                        statusDot.style.background = '#28a745'; // Green
+                        statusDot.style.background = 'var(--success)';
                         statusDot.title = `Online - Last seen: ${team.last_seen_text}`;
                     } else {
                         statusDot.style.background = '#6c757d'; // Grey
@@ -1577,13 +1577,13 @@
         }
 
         @keyframes score-pulse {
-            0%, 100% { background: #28a745; box-shadow: 0 0 8px rgba(40, 167, 69, 0.3); }
-            50% { background: #1e7e34; box-shadow: 0 0 20px rgba(40, 167, 69, 0.7); }
+            0%, 100% { background: var(--success); box-shadow: 0 0 8px color-mix(in srgb, var(--success) 30%, transparent); }
+            50% { background: var(--success); filter: brightness(0.75); box-shadow: 0 0 20px color-mix(in srgb, var(--success) 70%, transparent); }
         }
 
         .score-pulse {
             animation: score-pulse 1.5s ease-in-out infinite !important;
-            border-color: #28a745 !important;
+            border-color: var(--success) !important;
         }
 
         @keyframes spin {

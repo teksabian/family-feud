@@ -159,14 +159,14 @@
         }
         
         .answer-group {
-            background: rgba(40,167,69,0.2);
+            background: color-mix(in srgb, var(--success) 20%, transparent);
             padding: 15px;
             border-radius: 8px;
-            border: 2px solid #28a745;
+            border: 2px solid var(--success);
         }
-        
+
         .answer-label {
-            color: #28a745;
+            color: var(--success);
             font-weight: bold;
             margin-bottom: 8px;
             display: block;
@@ -185,12 +185,12 @@
             background: var(--bg-color);
             padding: 30px;
             border-radius: 15px;
-            border: 3px solid #28a745;
+            border: 3px solid var(--success);
             margin-bottom: 20px;
         }
-        
+
         button {
-            background: #28a745;
+            background: var(--success);
             color: white;
             border: none;
             padding: 20px 40px;
@@ -200,9 +200,10 @@
             cursor: pointer;
             width: 100%;
         }
-        
+
         button:hover {
-            background: #218838;
+            background: var(--success);
+            filter: brightness(0.85);
             transform: translateY(-2px);
         }
         
@@ -237,15 +238,15 @@
         }
 
         .survey-selector {
-            background: rgba(40, 167, 69, 0.15);
-            border: 2px solid #28a745;
+            background: color-mix(in srgb, var(--success) 15%, transparent);
+            border: 2px solid var(--success);
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
         }
 
         .survey-selector label {
-            color: #28a745;
+            color: var(--success);
             font-size: 1.2em;
             margin-bottom: 10px;
         }

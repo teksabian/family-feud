@@ -154,7 +154,7 @@
         }
 
         .btn-save {
-            background: #28a745;
+            background: var(--success);
             color: white;
             border: none;
             padding: 15px 30px;
@@ -167,9 +167,10 @@
         }
 
         .btn-save:hover {
-            background: #218838;
+            background: var(--success);
+            filter: brightness(0.85);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40,167,69,0.4);
+            box-shadow: 0 5px 15px color-mix(in srgb, var(--success) 40%, transparent);
         }
 
         .back-link {
@@ -189,15 +190,15 @@
         }
 
         .info-box {
-            background: rgba(40,167,69,0.1);
-            border: 2px solid #28a745;
+            background: color-mix(in srgb, var(--success) 10%, transparent);
+            border: 2px solid var(--success);
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 25px;
         }
 
         .info-box h3 {
-            color: #28a745;
+            color: var(--success);
             margin-bottom: 10px;
         }
 
@@ -241,7 +242,7 @@
         }
 
         .toggle-switch.active {
-            background: #28a745;
+            background: var(--success);
         }
 
         .toggle-slider {
@@ -281,11 +282,12 @@
         }
 
         .btn-pause.paused {
-            background: #28a745;
+            background: var(--success);
         }
 
         .btn-pause.paused:hover {
-            background: #218838;
+            background: var(--success);
+            filter: brightness(0.85);
         }
 
         /* Broadcast Form */
@@ -929,10 +931,10 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    status.style.color = '#28a745';
+                    status.style.color = 'var(--success)';
                     status.textContent = '✅ ' + data.message;
                     btn.innerHTML = '✅ Saved!';
-                    btn.style.background = '#28a745';
+                    btn.style.background = 'var(--success)';
                     setTimeout(() => {
                         btn.innerHTML = originalText;
                         btn.style.background = '#667eea';
@@ -975,10 +977,10 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    status.style.color = '#28a745';
+                    status.style.color = 'var(--success)';
                     status.textContent = '✅ ' + data.message;
                     btn.innerHTML = '✅ Cleared!';
-                    btn.style.background = '#28a745';
+                    btn.style.background = 'var(--success)';
                     // Update the corrections count on the page
                     const strong = document.querySelector('.card h2');
                     if (strong) {

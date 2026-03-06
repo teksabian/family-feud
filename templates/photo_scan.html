@@ -113,10 +113,10 @@
         .camera-btn:disabled { background: #555; cursor: not-allowed; }
 
         .camera-btn.submit-btn {
-            background: #28a745;
+            background: var(--success);
         }
-        .camera-btn.submit-btn:hover { background: #218838; }
-        .camera-btn.submit-btn:active { background: #1e7e34; }
+        .camera-btn.submit-btn:hover { background: var(--success); filter: brightness(0.85); }
+        .camera-btn.submit-btn:active { background: var(--success); filter: brightness(0.75); }
 
         .camera-btn.retake-btn {
             background: #6c757d;
@@ -332,8 +332,8 @@
         /* === SUCCESS TOAST === */
         .success-toast {
             display: none;
-            background: rgba(40,167,69,0.3);
-            border: 2px solid #28a745;
+            background: color-mix(in srgb, var(--success) 30%, transparent);
+            border: 2px solid var(--success);
             color: #fff;
             padding: 12px;
             border-radius: 10px;
@@ -795,7 +795,7 @@
             btn.style.background = '#dc3545';
             btn.textContent = msg;
             setTimeout(function() {
-                btn.style.background = '#28a745';
+                btn.style.background = 'var(--success)';
                 btn.textContent = original;
             }, 2000);
         }
