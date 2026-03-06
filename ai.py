@@ -193,7 +193,7 @@ def call_openai_api(client, model, messages, max_tokens=1024):
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             temperature=0,
         )
     return response.choices[0].message.content
