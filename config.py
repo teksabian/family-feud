@@ -299,6 +299,28 @@ THEMES = {
         'score_first_text': '#ffffff',
         'code_border':    '#333333',
     },
+    'gamenight': {
+        'name':           'Game Night',
+        'font_url':       'https://fonts.googleapis.com/css2?family=Lilita+One&display=swap',
+        'font_family':    "'Lilita One', 'Arial Black', Arial, sans-serif",
+        'bg_gradient':    'linear-gradient(135deg, #1a1040 0%, #2d1b69 50%, #1a1040 100%)',
+        'bg_color':       '#110b2e',
+        'accent':         '#facc15',
+        'card_border':    '#2d1b69',
+        'active_bg':      'linear-gradient(135deg, #2d1b69 0%, #3b2580 100%)',
+        'active_border':  '#facc15',
+        'text_primary':   '#ffffff',
+        'text_accent':    '#facc15',
+        'text_muted':     '#a78bfa',
+        'success':        '#2dd4bf',
+        'btn_bg':         '#facc15',
+        'btn_text':       '#1a1040',
+        'btn_blue_bg':    '#2d1b69',
+        'btn_blue_text':  '#2dd4bf',
+        'score_first_bg': 'linear-gradient(135deg, #facc15 0%, #fde68a 100%)',
+        'score_first_text': '#1a1040',
+        'code_border':    '#2d1b69',
+    },
 }
 
 # ===== REQUEST LOGGING =====
