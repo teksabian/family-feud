@@ -208,7 +208,7 @@ else:
     QR_DEFAULT_URL = 'http://localhost:5000'
 
 # ===== COLOR THEMES =====
-DEFAULT_THEME = os.environ.get('DEFAULT_THEME', 'classic')
+DEFAULT_THEME = os.environ.get('DEFAULT_THEME', 'gamenight')
 
 THEMES = {
     'classic': {

@@ -122,18 +122,19 @@
             padding: 15px;
             font-size: 1.2em;
             font-weight: bold;
-            background: #28a745;
+            background: var(--success);
             color: #fff;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s;
         }
-        
+
         button:hover {
-            background: #218838;
+            background: var(--success);
+            filter: brightness(0.85);
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(40,167,69,0.5);
+            box-shadow: 0 4px 15px color-mix(in srgb, var(--success) 50%, transparent);
         }
         
         .error {
