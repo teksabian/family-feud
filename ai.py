@@ -180,14 +180,23 @@ def get_provider_for_model(model_id):
 # Reasoning models use reasoning_effort instead of temperature
 OPENAI_REASONING_MODELS = frozenset({'gpt-5.2', 'gpt-5.4'})
 
+# Models that only accept their default temperature (no temperature param allowed)
+OPENAI_FIXED_TEMP_MODELS = frozenset({'gpt-5.3-chat-latest'})
+
 def call_openai_api(client, model, messages, max_tokens=1024):
-    """Call OpenAI Chat Completions API. Handles both standard and reasoning models."""
+    """Call OpenAI Chat Completions API. Handles reasoning, fixed-temp, and standard models."""
     if model in OPENAI_REASONING_MODELS:
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             max_completion_tokens=max_tokens,
             reasoning_effort='medium',
+        )
+    elif model in OPENAI_FIXED_TEMP_MODELS:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_completion_tokens=max_tokens,
         )
     else:
         response = client.chat.completions.create(
