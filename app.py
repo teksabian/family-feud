@@ -1,4 +1,5 @@
 from flask import Flask
+from markupsafe import Markup
 
 from config import APP_VERSION, STARTUP_ID, THEMES, DEFAULT_THEME
 from auth import auth_bp, configure_session
@@ -35,7 +36,8 @@ def inject_version():
 def inject_theme():
     key = get_setting('color_theme', DEFAULT_THEME)
     theme = THEMES.get(key, THEMES['classic'])
-    return dict(theme=theme, theme_key=key, themes=THEMES)
+    safe_theme = {k: Markup(v) if isinstance(v, str) else v for k, v in theme.items()}
+    return dict(theme=safe_theme, theme_key=key, themes=THEMES)
 
 @app.after_request
 def add_cache_headers(response):
