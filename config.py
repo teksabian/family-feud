@@ -74,7 +74,7 @@ logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logger.info(f"Log level: {logging.getLevelName(log_level)} (set LOG_LEVEL=DEBUG for verbose output)")
 
 # ===== APP CONSTANTS =====
-APP_VERSION = "v3.2.0 - Fission"
+APP_VERSION = "v4.0.0 - Plasma"
 
 # Use environment variable for secret key in production, generate random for local dev
 SECRET_KEY = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -329,17 +329,10 @@ THEMES = {
 }
 
 # ===== REQUEST LOGGING =====
-# Polling endpoints that fire every 5s per client - never log these
+# Endpoints to suppress from debug logs. With WebSocket push, most former
+# polling endpoints are now only hit on reconnect-sync (infrequent).
 QUIET_PATHS = frozenset([
-    '/api/heartbeat',
-    '/api/check-round-status',
-    '/api/broadcast-message',
-    '/host/codes-status',
-    '/host/check-active-round',
-    '/host/count-unscored',
-    '/host/team-status',
     '/host/get-sleep-status',
-    '/host/photo-scan/team-count',
 ])
 
 # ===== AI PROMPT CONSTANTS =====

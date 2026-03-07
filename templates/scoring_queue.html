@@ -820,13 +820,13 @@
             margin-left: 8px;
         }
 
-        /* Scored teams: read-only checkboxes */
-        .team-panel[data-scored="1"] .checkbox-row {
+        /* Submitted teams: read-only checkboxes */
+        .team-panel[data-host-submitted="1"] .checkbox-row {
             cursor: default;
             opacity: 0.7;
         }
 
-        .team-panel[data-scored="1"] .checkbox-row:hover {
+        .team-panel[data-host-submitted="1"] .checkbox-row:hover {
             background: rgba(255,255,255,0.05);
         }
     </style>
@@ -888,6 +888,7 @@
         <div class="team-panel" id="panel-{{ sub.id }}"
              data-index="{{ loop.index0 }}"
              data-scored="{{ sub.scored }}"
+             data-host-submitted="{{ sub.host_submitted }}"
              data-submission-id="{{ sub.id }}"
              data-team-name="{{ sub.team_name if sub.team_name else '[Deleted Team]' }}"
              data-team-code="{{ sub.code }}"
@@ -1068,21 +1069,21 @@
         }
 
         function nextUnscoredTeam() {
-            // Find next unscored team after current index
+            // Find next unsubmitted team after current index
             for (let i = currentIndex + 1; i < totalTeams; i++) {
-                if (panels[i].dataset.scored === '0') {
+                if (panels[i].dataset.hostSubmitted === '0') {
                     showTeam(i);
                     return true;
                 }
             }
             // Wrap around: search from beginning
             for (let i = 0; i < currentIndex; i++) {
-                if (panels[i].dataset.scored === '0') {
+                if (panels[i].dataset.hostSubmitted === '0') {
                     showTeam(i);
                     return true;
                 }
             }
-            return false; // all scored
+            return false; // all submitted
         }
 
         function updateNavBar() {
@@ -1092,6 +1093,7 @@
             const teamCode = panel.dataset.teamCode;
             const submittedTime = panel.dataset.submittedTime;
             const isScored = panel.dataset.scored === '1';
+            const isSubmitted = panel.dataset.hostSubmitted === '1';
 
             // Update name and team code
             document.getElementById('navTeamCode').textContent = teamCode;
@@ -1100,13 +1102,10 @@
             // Update badges
             const badgesEl = document.getElementById('navBadges');
             let badgesHtml = '';
-            if (isScored) {
-                // Check if AI scored
-                if (aiScoredSubmissions.has(parseInt(subId))) {
-                    badgesHtml = '<span class="badge badge-ai-scored">&#129302; AI SCORED</span>';
-                } else {
-                    badgesHtml = '<span class="badge badge-scored">&#10003; SCORED</span>';
-                }
+            if (isSubmitted) {
+                badgesHtml = '<span class="badge badge-scored">&#10003; SUBMITTED</span>';
+            } else if (isScored) {
+                badgesHtml = '<span class="badge badge-ai-scored">&#129302; AI SCORED</span>';
             }
             badgesEl.innerHTML = badgesHtml;
 
@@ -1120,7 +1119,7 @@
 
             // Compute current score for this team
             let currentScore = 0;
-            if (isScored) {
+            if (isSubmitted) {
                 currentScore = parseInt(panel.dataset.score) || 0;
             } else {
                 const form = document.getElementById(`form-${subId}`);
@@ -1159,11 +1158,11 @@
                     <div class="score-value">${currentScore}/${Math.round(maxScore)}</div>
                 </div>
                 <button type="submit"
-                        class="submit-btn ${isScored ? 'scored' : ''}"
+                        class="submit-btn ${isSubmitted ? 'scored' : ''}"
                         id="submit-btn-${subId}"
-                        ${isScored ? 'disabled' : ''}
+                        ${isSubmitted ? 'disabled' : ''}
                         onclick="document.getElementById('form-${subId}').dispatchEvent(new Event('submit', {cancelable: true}))">
-                    ${isScored ? '&#10003; SCORED' : '&#9989; SUBMIT'}
+                    ${isSubmitted ? '&#10003; SUBMITTED' : '&#9989; SUBMIT'}
                 </button>
             `;
 
@@ -1188,7 +1187,7 @@
         // ==================== SCORING ====================
         function toggleCheckbox(subId, ansNum, numAnswers) {
             const panel = document.getElementById(`panel-${subId}`);
-            if (panel && panel.dataset.scored === '1') return;
+            if (panel && panel.dataset.hostSubmitted === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             cb.checked = !cb.checked;
             onCheckboxChange(subId, ansNum, numAnswers);
@@ -1196,7 +1195,7 @@
 
         function onCheckboxChange(subId, ansNum, numAnswers) {
             const panel = document.getElementById(`panel-${subId}`);
-            if (panel && panel.dataset.scored === '1') return;
+            if (panel && panel.dataset.hostSubmitted === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             const row = document.getElementById(`cb-row-${subId}-${ansNum}`);
             row.classList.toggle('checked', cb.checked);
@@ -1247,9 +1246,10 @@
                     const data = await response.json();
                     unsavedChanges = false;
 
-                    // Mark panel as scored
+                    // Mark panel as submitted
                     const panel = document.getElementById(`panel-${submissionId}`);
                     panel.dataset.scored = '1';
+                    panel.dataset.hostSubmitted = '1';
                     panel.dataset.score = data.score;
 
                     // Update nav bar (shows SCORED button, badges)
@@ -1294,52 +1294,43 @@
             return false;
         }
 
-        // ==================== UNSCORED COUNT POLLING ====================
-        async function updateUnscoredCount() {
-            try {
-                const response = await fetch('/host/count-unscored');
-                const data = await response.json();
+        // ==================== UNSCORED COUNT UPDATE ====================
+        function applyUnscoredCount(count) {
+            const countSpan = document.getElementById('unscoredCount');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const leftCounter = document.getElementById('leftCounter');
 
-                const countSpan = document.getElementById('unscoredCount');
-                const refreshBtn = document.getElementById('refreshBtn');
-                const leftCounter = document.getElementById('leftCounter');
+            if (countSpan && count !== undefined) {
+                countSpan.textContent = count;
 
-                if (countSpan && data.count !== undefined) {
-                    countSpan.textContent = data.count;
+                if (count > 0) {
+                    refreshBtn.style.background = 'var(--success)';
+                    refreshBtn.style.color = 'white';
+                } else {
+                    refreshBtn.style.background = '#333';
+                    refreshBtn.style.color = '#fff';
+                }
 
-                    if (data.count > 0) {
-                        refreshBtn.style.background = 'var(--success)';
-                        refreshBtn.style.color = 'white';
+                // Auto-reload when new submissions arrive (for auto AI scoring)
+                if (count > lastKnownUnscoredCount && autoAiScoringEnabled) {
+                    if (!unsavedChanges) {
+                        console.log('[AUTO-AI] New submissions detected, reloading to trigger auto-scoring');
+                        window.location.reload();
+                        return;
                     } else {
-                        refreshBtn.style.background = '#333';
-                        refreshBtn.style.color = '#fff';
-                    }
-
-                    // Auto-reload when new submissions arrive (for auto AI scoring)
-                    if (data.count > lastKnownUnscoredCount && autoAiScoringEnabled) {
-                        if (!unsavedChanges) {
-                            console.log('[AUTO-AI] New submissions detected, reloading to trigger auto-scoring');
-                            window.location.reload();
-                            return;
-                        } else {
-                            if (typeof showToast === 'function') {
-                                showToast('New submissions received — refresh when ready', 'info', 5000);
-                            }
+                        if (typeof showToast === 'function') {
+                            showToast('New submissions received — refresh when ready', 'info', 5000);
                         }
                     }
-
-                    lastKnownUnscoredCount = data.count;
                 }
 
-                if (leftCounter) {
-                    leftCounter.textContent = `${data.count}/${totalTeams} left`;
-                }
-            } catch (error) {
-                console.error('Failed to update unscored count:', error);
+                lastKnownUnscoredCount = count;
+            }
+
+            if (leftCounter) {
+                leftCounter.textContent = `${count}/${totalTeams} left`;
             }
         }
-
-        setInterval(updateUnscoredCount, 5000);
 
         function checkForUnsaved() {
             if (unsavedChanges) {
@@ -1791,7 +1782,7 @@
             if (!autoAiScoringEnabled || !aiScoringEnabled) return;
             for (const panel of panels) {
                 if (!autoAiScoringEnabled) break; // stop if toggled off mid-run
-                if (panel.dataset.scored === '0') {
+                if (panel.dataset.hostSubmitted === '0') {
                     const subId = parseInt(panel.dataset.submissionId);
                     if (!aiScoredSubmissions.has(subId) && !aiThinkingSubmissions.has(subId)) {
                         await scoreWithAIQuiet(subId, maxAnswers);
@@ -1872,10 +1863,10 @@
         // ==================== INITIALIZATION ====================
         document.addEventListener('DOMContentLoaded', function() {
             if (totalTeams > 0) {
-                // Start on first unscored team
+                // Start on first unsubmitted team
                 let startIndex = 0;
                 for (let i = 0; i < totalTeams; i++) {
-                    if (panels[i].dataset.scored === '0') {
+                    if (panels[i].dataset.hostSubmitted === '0') {
                         startIndex = i;
                         break;
                     }
@@ -1916,13 +1907,51 @@
             // Auto AI Scoring: catch-up for any unscored submissions not yet AI-scored
             // (e.g. submissions that arrived before auto-score was enabled)
             if (autoAiScoringEnabled && aiScoringEnabled) {
-                setTimeout(() => {
-                    triggerAutoAiScoringForAll();
+                setTimeout(async () => {
+                    await triggerAutoAiScoringForAll();
+                    // Retry once more after 5s for any that failed on first pass
+                    setTimeout(() => {
+                        triggerAutoAiScoringForAll();
+                    }, 5000);
                 }, 500);
             }
         });
     </script>
 
     {% include '_toast.html' %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on('connect', async () => {
+            console.log('[WS] Connected, transport:', socket.io.engine.transport.name);
+            try {
+                const res = await fetch('/host/count-unscored');
+                const data = await res.json();
+                applyUnscoredCount(data.count);
+            } catch (e) {
+                console.warn('[WS] Reconnect sync failed:', e);
+            }
+        });
+
+        socket.on('scoring:count', (data) => {
+            console.log('[WS] scoring:count', data.unscored_count);
+            applyUnscoredCount(data.unscored_count);
+        });
+
+        socket.on('scoring:submission_scored', (data) => {
+            console.log('[WS] scoring:submission_scored', data);
+            const panel = document.querySelector(`.team-panel[data-submission-id="${data.submission_id}"]`);
+            if (panel) {
+                panel.dataset.scored = '1';
+                // Reload the page to pick up AI results (checked_answers, ai_matches, etc.)
+                if (!unsavedChanges && panel.dataset.hostSubmitted === '0') {
+                    console.log('[WS] Server auto-scored submission, reloading to show results');
+                    window.location.reload();
+                }
+            }
+        });
+    </script>
 </body>
 </html>

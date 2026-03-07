@@ -7,6 +7,7 @@ from flask import request, render_template, redirect, url_for, jsonify, flash
 from config import logger, BASE_DIR
 from auth import host_required
 from database import db_connect, get_setting
+from extensions import socketio
 from parsers import parse_pptx, parse_docx
 
 from routes.host import host_bp, ROUNDS_CONFIG
@@ -303,6 +304,20 @@ def activate_round(round_id):
             conn.execute("UPDATE rounds SET is_active = 0")
             conn.execute("UPDATE rounds SET is_active = 1 WHERE id = ?", (round_id,))
             conn.commit()
+
+            round_info = conn.execute(
+                "SELECT id, round_number, question, num_answers FROM rounds WHERE id = ?",
+                (round_id,)
+            ).fetchone()
+            round_started_data = {
+                'round_id': round_info['id'],
+                'round_number': round_info['round_number'],
+                'question': round_info['question'],
+                'num_answers': round_info['num_answers']
+            }
+            socketio.emit('round:started', round_started_data, to='teams')
+            socketio.emit('round:started', round_started_data, to='hosts')
+
             logger.info(f"[ROUND] activate_round() - round_id={round_id} now active (deactivated all others)")
             flash(f'\u2705 Round activated: {round_data["question"]}', 'success')
         except Exception as e:
@@ -383,6 +398,29 @@ def start_next_round():
             if next_round:
                 conn.execute("UPDATE rounds SET is_active = 1 WHERE id = ?", (next_round['id'],))
                 conn.commit()
+
+                # Include previous round's winner so phones can show the interstitial
+                prev_winner = conn.execute("""
+                    SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                    FROM rounds r
+                    LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id
+                    WHERE r.id = ?
+                """, (active_round['id'],)).fetchone()
+
+                round_started_data = {
+                    'round_id': next_round['id'],
+                    'round_number': next_round['round_number'],
+                    'question': next_round['question'],
+                    'num_answers': next_round['num_answers']
+                }
+                if prev_winner and prev_winner['winner_code']:
+                    round_started_data['previous_winner_team'] = prev_winner['team_name']
+                    round_started_data['previous_winner_score'] = prev_winner['score']
+                    round_started_data['previous_round_number'] = prev_winner['round_number']
+
+                socketio.emit('round:started', round_started_data, to='teams')
+                socketio.emit('round:started', round_started_data, to='hosts')
                 logger.info(f"[ROUND] Activated round {current_num + 1} (id={next_round['id']})")
             else:
                 # No more rounds - game over
@@ -528,6 +566,8 @@ def close_round():
         # Mark round as closed
         conn.execute("UPDATE rounds SET submissions_closed = 1 WHERE id = ?", (active_round['id'],))
         conn.commit()
+        socketio.emit('round:closed', {'round_id': active_round['id']}, to='teams')
+        socketio.emit('round:closed', {'round_id': active_round['id']}, to='hosts')
 
         # Count submissions
         sub_count = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",
@@ -535,7 +575,7 @@ def close_round():
 
         # Check if all submissions are already scored
         unscored_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND scored = 0",
+            "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND host_submitted = 0",
             (active_round['id'],)
         ).fetchone()['cnt']
 

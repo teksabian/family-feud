@@ -391,27 +391,28 @@
         <a href="{{ url_for('host.host_dashboard') }}?desktop=1&v={{ cache_bust }}" class="back-link">Back to Dashboard</a>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // Poll for active round every 5 seconds
-        async function checkForRound() {
+        const socket = io();
+
+        socket.on('connect', async () => {
+            console.log('[WS] Connected, transport:', socket.io.engine.transport.name);
             try {
                 var response = await fetch('/host/check-active-round', {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 var data = await response.json();
                 if (data.has_active_round) {
-                    console.log('[PHOTO-SCAN] Active round detected, reloading');
                     window.location.reload();
                 }
-            } catch (error) {
-                console.warn('[PHOTO-SCAN] Polling error:', error);
+            } catch (e) {
+                console.warn('[WS] Reconnect sync failed:', e);
             }
-        }
-        checkForRound();
-        setInterval(checkForRound, 5000);
+        });
 
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) { checkForRound(); }
+        socket.on('round:started', (data) => {
+            console.log('[WS] round:started', data);
+            window.location.reload();
         });
     </script>
     {% include '_toast.html' %}
@@ -777,6 +778,7 @@
                 if (response.ok && data.success) {
                     scannedCount++;
                     updateCounter();
+                    refreshTeamCount();
                     showSuccessAndReturn(data.code, data.team_name);
                 } else {
                     btn.disabled = false;
@@ -848,7 +850,7 @@
             showSection('errorSection');
         }
 
-        // --- Refresh team count from server periodically ---
+        // --- Refresh team count from server ---
         function refreshTeamCount() {
             fetch('{{ url_for("scoring.photo_scan_team_count") }}', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -862,39 +864,6 @@
             .catch(function() { /* silent fail */ });
         }
 
-        // Refresh count every 30s
-        setInterval(refreshTeamCount, 30000);
-
-        // --- Poll for round changes every 5 seconds ---
-        async function checkRoundChange() {
-            try {
-                var response = await fetch('/host/check-active-round', {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                var data = await response.json();
-                if (!data.has_active_round) {
-                    console.log('[PHOTO-SCAN] Round deactivated, reloading');
-                    window.location.reload();
-                    return;
-                }
-                if (data.round_id !== ROUND_ID) {
-                    console.log('[PHOTO-SCAN] Round changed from', ROUND_ID, 'to', data.round_id, '- reloading');
-                    window.location.reload();
-                    return;
-                }
-            } catch (error) {
-                console.warn('[PHOTO-SCAN] Round check error:', error);
-            }
-        }
-        setInterval(checkRoundChange, 5000);
-
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                checkRoundChange();
-                refreshTeamCount();
-            }
-        });
-
         // --- Select all text on focus so host can immediately retype ---
         document.getElementById('reviewSection').addEventListener('focusin', function(e) {
             var el = e.target;
@@ -903,6 +872,47 @@
             }
         });
     </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on('connect', async () => {
+            console.log('[WS] Connected, transport:', socket.io.engine.transport.name);
+            try {
+                var response = await fetch('/host/check-active-round', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                var data = await response.json();
+                if (!data.has_active_round || data.round_id !== ROUND_ID) {
+                    window.location.reload();
+                    return;
+                }
+            } catch (e) {
+                console.warn('[WS] Reconnect sync failed:', e);
+            }
+            refreshTeamCount();
+        });
+
+        socket.on('round:started', (data) => {
+            console.log('[WS] round:started', data);
+            if (data.round_id !== ROUND_ID) {
+                window.location.reload();
+            }
+        });
+
+        socket.on('round:ended', (data) => {
+            console.log('[WS] round:ended', data);
+            window.location.reload();
+        });
+
+        socket.on('team:joined', (data) => {
+            console.log('[WS] team:joined', data);
+            totalTeams++;
+            updateCounter();
+        });
+    </script>
+
     {% include '_toast.html' %}
 
     {% endif %}

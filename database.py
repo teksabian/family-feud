@@ -107,6 +107,7 @@ def init_db():
                 tiebreaker INTEGER,
                 score INTEGER DEFAULT 0,
                 scored INTEGER DEFAULT 0,
+                host_submitted INTEGER DEFAULT 0,
                 scored_at TIMESTAMP,
                 submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (round_id) REFERENCES rounds (id),
@@ -231,6 +232,15 @@ def init_db():
             conn.execute("ALTER TABLE submissions ADD COLUMN ai_reasoning TEXT DEFAULT NULL")
             conn.commit()
             logger.info("Migration complete: ai_reasoning column added")
+
+        try:
+            conn.execute("SELECT host_submitted FROM submissions LIMIT 1")
+        except:
+            logger.info("Adding host_submitted column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN host_submitted INTEGER DEFAULT 0")
+            conn.execute("UPDATE submissions SET host_submitted = 1 WHERE scored = 1")
+            conn.commit()
+            logger.info("Migration complete: host_submitted column added (backfilled from scored)")
 
         # Migration: Split ai_model into ai_ocr_model and ai_scoring_model
         existing_ai_model = conn.execute(

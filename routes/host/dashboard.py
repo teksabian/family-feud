@@ -15,6 +15,7 @@ from database import (
     get_setting,
     set_setting,
 )
+from extensions import socketio
 from ai import (
     load_corrections_history,
     get_current_ocr_model,
@@ -63,7 +64,7 @@ def host_dashboard():
         if active_round:
             unscored_count = conn.execute("""
                 SELECT COUNT(*) as cnt FROM submissions
-                WHERE round_id = ? AND scored = 0
+                WHERE round_id = ? AND host_submitted = 0
             """, (active_round['id'],)).fetchone()['cnt']
 
             # Total submissions for active round
@@ -272,6 +273,7 @@ def toggle_sleep():
     new_value = 'false' if current_value == 'true' else 'true'
 
     set_setting('server_sleep', new_value, 'Server sleep mode - stops auto-refresh')
+    socketio.emit('sleep:toggled', {'is_sleeping': new_value == 'true'}, to='teams')
 
     if new_value == 'true':
         logger.info("[SETTINGS] Server sleep mode ENABLED - team auto-refresh will stop")

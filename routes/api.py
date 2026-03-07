@@ -1,54 +1,31 @@
 """
 API and polling routes for Family Feud.
 
-Owns: All JSON endpoints used by JavaScript polling — heartbeat,
-round status, broadcast messages, view-only status, and host team status.
+Owns: JSON endpoints used by JavaScript polling — round status,
+broadcast messages, view-only status, and host team status.
+These endpoints serve as reconnect-sync fallbacks; primary updates are via WebSocket.
 """
 
 import json
-from datetime import datetime
 from flask import Blueprint, jsonify, session
 
 from config import logger, STARTUP_ID, reset_state
-from auth import team_session_valid, host_required
+from auth import host_required
 from database import db_connect, get_setting
+from sockets import get_online_teams
 
 api_bp = Blueprint('api', __name__)
 
 
-@api_bp.route('/api/heartbeat', methods=['POST'])
-@team_session_valid
-def heartbeat():
-    """Update last heartbeat timestamp for active tab detection"""
-    code = session.get('code')
-    logger.debug(f"[API] heartbeat() - code={code}")
-
-    if not code:
-        return jsonify({"success": False}), 401
-
-    with db_connect() as conn:
-        conn.execute("""
-            UPDATE team_codes
-            SET last_heartbeat = CURRENT_TIMESTAMP
-            WHERE code = ?
-        """, (code,))
-        conn.commit()
-
-    return jsonify({"success": True})
-
 @api_bp.route('/host/team-status')
 @host_required
 def get_team_status():
-    """Get status of all teams (online/offline) for host dashboard"""
+    """Get status of all teams (online/offline) for host dashboard. Primary updates via WebSocket."""
     logger.debug("[API] get_team_status() called")
+    online = get_online_teams()
     with db_connect() as conn:
         teams = conn.execute("""
-            SELECT code, team_name, used, last_heartbeat,
-                   CASE
-                       WHEN last_heartbeat IS NULL THEN 0
-                       WHEN (julianday('now') - julianday(last_heartbeat)) * 86400 <= 15 THEN 1
-                       ELSE 0
-                   END as is_online
+            SELECT code, team_name, used
             FROM team_codes
             ORDER BY code
         """).fetchall()
@@ -56,26 +33,7 @@ def get_team_status():
         result = []
         for team in teams:
             team_dict = dict(team)
-            # Calculate last seen time
-            if team['last_heartbeat']:
-                try:
-                    last_seen = datetime.fromisoformat(team['last_heartbeat'].replace('Z', '+00:00'))
-                    now = datetime.now(last_seen.tzinfo) if last_seen.tzinfo else datetime.now()
-                    seconds_ago = int((now - last_seen).total_seconds())
-
-                    if seconds_ago < 60:
-                        team_dict['last_seen_text'] = f"{seconds_ago} seconds ago"
-                    elif seconds_ago < 3600:
-                        minutes = seconds_ago // 60
-                        team_dict['last_seen_text'] = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-                    else:
-                        hours = seconds_ago // 3600
-                        team_dict['last_seen_text'] = f"{hours} hour{'s' if hours != 1 else ''} ago"
-                except:
-                    team_dict['last_seen_text'] = "Unknown"
-            else:
-                team_dict['last_seen_text'] = "Never"
-
+            team_dict['is_online'] = 1 if team['code'] in online else 0
             result.append(team_dict)
 
         online_count = sum(1 for t in result if t.get('is_online'))
@@ -84,7 +42,7 @@ def get_team_status():
 
 @api_bp.route('/api/check-round-status')
 def check_round_status():
-    """API endpoint to check if there's an active round (for AJAX polling)"""
+    """Round status for client reconnect-sync. Primary updates via WebSocket."""
     code = session.get('code')
     logger.debug(f"[API] check_round_status() - code={code}")
 
@@ -150,7 +108,7 @@ def check_round_status():
 
 @api_bp.route('/api/broadcast-message')
 def api_broadcast_message():
-    """API endpoint for teams to get current broadcast message"""
+    """Broadcast message for client reconnect-sync. Primary updates via WebSocket."""
     logger.debug("[API] api_broadcast_message() called")
 
     broadcast_json = get_setting('broadcast_message', '')
@@ -171,7 +129,7 @@ def api_broadcast_message():
 
 @api_bp.route('/api/view-status/<code>')
 def api_view_status(code):
-    """API endpoint for view-only page polling. Returns round + scoring state."""
+    """View-only status for client reconnect-sync. Primary updates via WebSocket."""
     code = code.strip().upper()
     logger.debug(f"[API] api_view_status() - code={code}")
 
