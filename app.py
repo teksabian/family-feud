@@ -1,5 +1,5 @@
-from gevent import monkey
-monkey.patch_all()
+import eventlet
+eventlet.monkey_patch()
 
 from flask import Flask
 from markupsafe import Markup
@@ -20,7 +20,7 @@ from database import (
 
 app = Flask(__name__)
 configure_session(app)
-socketio.init_app(app, cors_allowed_origins="*", async_mode="gevent")
+socketio.init_app(app, cors_allowed_origins="*", async_mode="eventlet")
 app.register_blueprint(auth_bp)
 app.register_blueprint(host_bp)
 app.register_blueprint(team_bp)
