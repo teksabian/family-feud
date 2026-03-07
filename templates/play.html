@@ -425,8 +425,13 @@
                 padding: 6px 10px;
             }
         }
+
+        /* Compact header mode - toggled via JS when keyboard opens on mobile */
+        body.compact-mode {
+            padding-top: 60px !important;
+        }
     </style>
-    
+
     <!-- Toast Notification System -->
     <style>
         #toast-container {
@@ -1363,8 +1368,9 @@
     </script>
     
     <script>
-        // Validate answers before submission
+        // Validate and submit answers via AJAX
         function validateAnswers(event) {
+            event.preventDefault();
             console.log('[SUBMIT] Validating answers before submission');
             const form = event.target;
             const answerInputs = form.querySelectorAll('input[type="text"]');
@@ -1380,13 +1386,34 @@
             if (blankCount > 0) {
                 const plural = blankCount === 1 ? 'answer is' : 'answers are';
                 const message = `⚠️ Warning: ${blankCount} ${plural} blank!\n\nAre you sure you want to submit?`;
-                return confirm(message);
+                if (!confirm(message)) return false;
             }
 
-            // Clear auto-saved data on successful submission
-            clearAutoSave();
+            // Submit via AJAX
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    clearAutoSave();
+                    // Reload to show submitted view with answer preview
+                    window.location.href = '{{ url_for("team.team_play") }}';
+                } else if (data.duplicate) {
+                    showToast(data.error || 'You have already submitted for this round.', 'warning');
+                } else {
+                    showToast(data.error || 'Submission failed.', 'error');
+                }
+            })
+            .catch(() => {
+                // Network error - fall back to traditional form submission
+                form.submit();
+            });
 
-            return true;
+            return false;
         }
         
         // Auto-save functionality
@@ -1454,14 +1481,31 @@
             }
         }
         
+        // Compact header: shrink header when mobile keyboard opens (input focus)
+        function compactHeader() {
+            const headerEl = document.querySelector('.fixed-header');
+            if (headerEl && !headerEl.classList.contains('header-compact')) {
+                headerEl.classList.add('header-compact');
+                document.body.classList.add('compact-mode');
+            }
+        }
+
+        function expandHeader() {
+            const headerEl = document.querySelector('.fixed-header');
+            if (headerEl) {
+                headerEl.classList.remove('header-compact');
+                document.body.classList.remove('compact-mode');
+            }
+        }
+
         // Set up auto-save on page load
         window.addEventListener('DOMContentLoaded', function() {
             const form = document.querySelector('form');
             if (!form) return;
-            
+
             // Restore any saved answers
             restoreAnswers();
-            
+
             // Auto-save on input change (debounced)
             let saveTimeout;
             form.querySelectorAll('input').forEach(input => {
@@ -1469,6 +1513,10 @@
                     clearTimeout(saveTimeout);
                     saveTimeout = setTimeout(saveAnswers, 500); // Save 500ms after typing stops
                 });
+
+                // Compact header on mobile keyboard open
+                input.addEventListener('focus', compactHeader);
+                input.addEventListener('blur', expandHeader);
             });
         });
         

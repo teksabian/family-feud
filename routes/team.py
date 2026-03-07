@@ -7,7 +7,7 @@ play page, answer submission, view page, and terms page.
 
 import sqlite3
 import threading
-from flask import Blueprint, request, render_template, redirect, url_for, session, flash
+from flask import Blueprint, request, render_template, redirect, url_for, session, flash, jsonify
 
 from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED
 from auth import team_session_valid
@@ -357,8 +357,12 @@ def submit_answers():
             (code, round_id)
         ).fetchone()
 
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         if existing_submission:
             logger.warning(f"[TEAM] submit_answers() - duplicate submission from code={code} for round_id={round_id}")
+            if is_ajax:
+                return jsonify({'success': False, 'duplicate': True, 'error': 'You have already submitted for this round.'}), 409
             flash('✅ You have already submitted for this round!', 'warning')
             return redirect(url_for('team.team_play'))
 
@@ -400,9 +404,14 @@ def submit_answers():
                 'answers': answers,
                 'tiebreaker': tiebreaker
             }
+
+            if is_ajax:
+                return jsonify({'success': True, 'answers': answers, 'tiebreaker': tiebreaker})
         except sqlite3.IntegrityError:
             # Fallback: UNIQUE constraint caught it
             logger.warning(f"[TEAM] submit_answers() - UNIQUE constraint caught duplicate from code={code}")
+            if is_ajax:
+                return jsonify({'success': False, 'duplicate': True, 'error': 'You have already submitted for this round.'}), 409
             flash('✅ You have already submitted for this round!', 'warning')
 
     return redirect(url_for('team.team_play'))
