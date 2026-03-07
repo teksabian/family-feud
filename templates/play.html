@@ -836,8 +836,16 @@
             </div>
             {% endif %}
             
+            <!-- Submission counter (updated via WS) -->
+            <div id="submissionCounter" style="text-align: center; margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+                <span style="color: #999; font-size: 0.9em;" id="submissionCounterText">Waiting for scores...</span>
+            </div>
+
+            <!-- Results container (populated via WS when scoring completes) -->
+            <div id="resultsContainer" style="display: none;"></div>
+
             {% if submissions_closed %}
-            <div style="padding: 20px; background: rgba(220,53,69,0.2); border: 2px solid #dc3545; border-radius: 10px; margin: 20px 0;">
+            <div id="scoringStatusBanner" style="padding: 20px; background: rgba(220,53,69,0.2); border: 2px solid #dc3545; border-radius: 10px; margin: 20px 0;">
                 <h3 style="color: #dc3545; margin-bottom: 10px;">⏰ Round Has Ended</h3>
                 <p style="margin: 0;">The host is now scoring. Wait for the next round!</p>
             </div>
@@ -846,7 +854,7 @@
                 ⚠️ Do not manually refresh the page
             </div>
 
-            <div class="waiting" style="padding: 20px 0;">
+            <div id="waitingSection" class="waiting" style="padding: 20px 0;">
                 <div class="loading"></div>
                 <p>Waiting for next round...</p>
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page will refresh automatically</p>
@@ -865,9 +873,22 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         let winnerShown = false;
+
+        // Store submitted answers for match highlighting
+        var mySubmittedAnswers = {};
+        var myNumAnswers = {{ num_answers }};
+        {% if last_submission %}
+        {% for i in range(1, num_answers + 1) %}
+        mySubmittedAnswers['answer{{ i }}'] = {{ (last_submission.answers['answer' ~ i] or '')|tojson }};
+        {% endfor %}
+        {% elif submission %}
+        {% for i in range(1, num_answers + 1) %}
+        mySubmittedAnswers['answer{{ i }}'] = {{ (submission['answer' ~ i] or '')|tojson }};
+        {% endfor %}
+        {% endif %}
 
         function dismissBroadcast() {
             const text = document.getElementById('broadcast-text').textContent;
@@ -893,6 +914,205 @@
             document.getElementById('winner-interstitial').style.display = 'block';
             winnerShown = true;
         }
+
+        function updateSubmissionCounter(submitted, total) {
+            var el = document.getElementById('submissionCounterText');
+            if (el && total > 0) {
+                el.textContent = submitted + ' of ' + total + ' teams submitted';
+            }
+        }
+
+        function ordinal(n) {
+            var s = ['th','st','nd','rd'];
+            var v = n % 100;
+            return n + (s[(v-20)%10] || s[v] || s[0]);
+        }
+
+        function showResultsView(roundData, myResult) {
+            var container = document.getElementById('resultsContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+            container.style.display = 'block';
+
+            // Hide waiting/scoring status sections
+            var waitSec = document.getElementById('waitingSection');
+            if (waitSec) waitSec.style.display = 'none';
+            var scoreBanner = document.getElementById('scoringStatusBanner');
+            if (scoreBanner) scoreBanner.style.display = 'none';
+            var counterEl = document.getElementById('submissionCounter');
+            if (counterEl) counterEl.style.display = 'none';
+
+            // --- Your Score ---
+            if (myResult) {
+                var scoreBox = document.createElement('div');
+                scoreBox.style.cssText = 'text-align:center; padding:20px; margin-bottom:15px; background:linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05)); border:1px solid rgba(255,215,0,0.3); border-radius:12px;';
+
+                var scoreNum = document.createElement('div');
+                scoreNum.style.cssText = 'font-size:2.5em; font-weight:bold; color:#ffd700;';
+                scoreNum.textContent = myResult.score + ' / ' + roundData.num_answers;
+                scoreBox.appendChild(scoreNum);
+
+                var rankText = document.createElement('div');
+                rankText.style.cssText = 'font-size:1em; color:#ccc; margin-top:5px;';
+                rankText.textContent = ordinal(myResult.rank) + ' of ' + myResult.total_teams + ' teams';
+                scoreBox.appendChild(rankText);
+
+                container.appendChild(scoreBox);
+
+                // --- Your Answers with match indicators ---
+                var checkedSet = new Set();
+                if (myResult.checked_answers) {
+                    myResult.checked_answers.split(',').forEach(function(n) {
+                        if (n.trim()) checkedSet.add(parseInt(n.trim()));
+                    });
+                }
+
+                var matchBox = document.createElement('div');
+                matchBox.style.cssText = 'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var matchHeading = document.createElement('h3');
+                matchHeading.style.cssText = 'color:#999; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                matchHeading.textContent = 'Your Answers';
+                matchBox.appendChild(matchHeading);
+
+                var matchList = document.createElement('div');
+                matchList.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+                for (var i = 1; i <= myNumAnswers; i++) {
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; gap:10px;';
+
+                    var icon = document.createElement('span');
+                    var isMatch = checkedSet.has(i);
+                    icon.style.cssText = 'width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.85em; flex-shrink:0;';
+                    if (isMatch) {
+                        icon.style.background = 'rgba(40,167,69,0.3)';
+                        icon.style.color = '#28a745';
+                        icon.textContent = '\u2713';
+                    } else {
+                        icon.style.background = 'rgba(220,53,69,0.2)';
+                        icon.style.color = '#dc3545';
+                        icon.textContent = '\u2717';
+                    }
+
+                    var ansText = document.createElement('span');
+                    ansText.style.cssText = 'font-size:1em;';
+                    ansText.style.color = isMatch ? '#28a745' : '#999';
+                    ansText.textContent = mySubmittedAnswers['answer' + i] || '(blank)';
+
+                    row.appendChild(icon);
+                    row.appendChild(ansText);
+                    matchList.appendChild(row);
+                }
+                matchBox.appendChild(matchList);
+                container.appendChild(matchBox);
+            }
+
+            // --- Survey Answers ---
+            if (roundData.survey_answers && roundData.survey_answers.length > 0) {
+                var surveyBox = document.createElement('div');
+                surveyBox.style.cssText = 'background:rgba(255,215,0,0.08); border:1px solid rgba(255,215,0,0.25); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var surveyHeading = document.createElement('h3');
+                surveyHeading.style.cssText = 'color:#ffd700; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                surveyHeading.textContent = 'Answers on the Board';
+                surveyBox.appendChild(surveyHeading);
+
+                var surveyList = document.createElement('div');
+                surveyList.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+                for (var j = 0; j < roundData.survey_answers.length; j++) {
+                    var sRow = document.createElement('div');
+                    sRow.style.cssText = 'display:flex; align-items:center; gap:10px;';
+                    var sNum = document.createElement('span');
+                    sNum.style.cssText = 'background:rgba(255,215,0,0.25); color:#ffd700; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; font-size:0.85em;';
+                    sNum.textContent = (j + 1);
+                    var sAns = document.createElement('span');
+                    sAns.style.cssText = 'color:#eee; font-size:1em;';
+                    sAns.textContent = roundData.survey_answers[j];
+                    sRow.appendChild(sNum);
+                    sRow.appendChild(sAns);
+                    surveyList.appendChild(sRow);
+                }
+                surveyBox.appendChild(surveyList);
+                container.appendChild(surveyBox);
+            }
+
+            // --- Leaderboard ---
+            if (roundData.leaderboard && roundData.leaderboard.length > 0) {
+                var lbBox = document.createElement('div');
+                lbBox.style.cssText = 'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var lbHeading = document.createElement('h3');
+                lbHeading.style.cssText = 'color:#999; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                lbHeading.textContent = 'Leaderboard';
+                lbBox.appendChild(lbHeading);
+
+                var lbList = document.createElement('div');
+                lbList.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+                var teamName = '{{ team_name|e }}';
+                for (var k = 0; k < roundData.leaderboard.length; k++) {
+                    var entry = roundData.leaderboard[k];
+                    var lbRow = document.createElement('div');
+                    lbRow.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:8px;';
+
+                    var isMe = entry.team_name === teamName;
+                    if (entry.is_winner) {
+                        lbRow.style.background = 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.08))';
+                        lbRow.style.border = '1px solid rgba(255,215,0,0.3)';
+                    } else if (isMe) {
+                        lbRow.style.background = 'rgba(100,149,237,0.15)';
+                        lbRow.style.border = '1px solid rgba(100,149,237,0.3)';
+                    } else {
+                        lbRow.style.background = 'rgba(255,255,255,0.03)';
+                    }
+
+                    var leftSide = document.createElement('div');
+                    leftSide.style.cssText = 'display:flex; align-items:center; gap:10px;';
+
+                    var rankBadge = document.createElement('span');
+                    rankBadge.style.cssText = 'font-weight:bold; font-size:0.9em; min-width:24px;';
+                    rankBadge.style.color = entry.rank === 1 ? '#ffd700' : '#999';
+                    rankBadge.textContent = entry.is_winner ? '\uD83C\uDFC6' : '#' + entry.rank;
+
+                    var nameSpan = document.createElement('span');
+                    nameSpan.style.cssText = 'font-size:1em;';
+                    nameSpan.style.color = isMe ? '#6495ed' : '#ccc';
+                    nameSpan.style.fontWeight = isMe ? 'bold' : 'normal';
+                    nameSpan.textContent = entry.team_name + (isMe ? ' (you)' : '');
+
+                    leftSide.appendChild(rankBadge);
+                    leftSide.appendChild(nameSpan);
+
+                    var scoreSpan = document.createElement('span');
+                    scoreSpan.style.cssText = 'font-weight:bold; font-size:1.1em;';
+                    scoreSpan.style.color = entry.is_winner ? '#ffd700' : '#ccc';
+                    scoreSpan.textContent = entry.score + ' pts';
+
+                    lbRow.appendChild(leftSide);
+                    lbRow.appendChild(scoreSpan);
+                    lbList.appendChild(lbRow);
+                }
+                lbBox.appendChild(lbList);
+                container.appendChild(lbBox);
+            }
+
+            // --- Waiting for next round footer ---
+            var footWait = document.createElement('div');
+            footWait.style.cssText = 'text-align:center; padding:15px 0; color:#999; font-size:0.9em;';
+            footWait.innerHTML = '<div class="loading" style="margin:0 auto 10px;"></div>Waiting for next round...';
+            container.appendChild(footWait);
+        }
+
+        // Fetch submission count and results on page load
+        fetch('/api/submission-count')
+            .then(r => r.json())
+            .then(d => updateSubmissionCounter(d.submitted, d.total))
+            .catch(() => {});
+        fetch('/api/round-results')
+            .then(r => r.json())
+            .then(d => {
+                if (d.has_results) {
+                    showResultsView(d, d.my_result);
+                }
+            })
+            .catch(() => {});
     </script>
 
     {% else %}
@@ -1121,6 +1341,12 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
 
+            // Store answers for results match highlighting
+            answerInputs.forEach(function(input, idx) {
+                mySubmittedAnswers['answer' + (idx + 1)] = input.value.trim();
+            });
+            myNumAnswers = answerInputs.length;
+
             // Submit via AJAX
             const formData = new FormData(form);
             fetch(form.action, {
@@ -1239,11 +1465,223 @@
             var progress = document.getElementById('answerProgress');
             if (progress) progress.style.display = 'none';
 
+            // Submission counter
+            var counterDiv = document.createElement('div');
+            counterDiv.id = 'submissionCounter';
+            counterDiv.style.cssText = 'text-align:center; margin:15px 0; padding:10px; background:rgba(255,255,255,0.04); border-radius:8px;';
+            var counterText = document.createElement('span');
+            counterText.id = 'submissionCounterText';
+            counterText.style.cssText = 'color:#999; font-size:0.9em;';
+            counterText.textContent = 'Waiting for other teams...';
+            counterDiv.appendChild(counterText);
+            wrapper.appendChild(counterDiv);
+
+            // Results container (populated when scoring completes)
+            var resultsDiv = document.createElement('div');
+            resultsDiv.id = 'resultsContainer';
+            resultsDiv.style.display = 'none';
+            wrapper.appendChild(resultsDiv);
+
             // Replace card content (keep the card div itself)
             card.innerHTML = '';
             card.appendChild(wrapper);
 
+            // Fetch current submission count
+            fetch('/api/submission-count')
+                .then(r => r.json())
+                .then(d => updateSubmissionCounter(d.submitted, d.total))
+                .catch(() => {});
+
             // WebSocket will handle next round detection
+        }
+
+        // Store submitted answers for match highlighting
+        var mySubmittedAnswers = {};
+        var myNumAnswers = {{ num_answers if num_answers is defined else 0 }};
+
+        function updateSubmissionCounter(submitted, total) {
+            var el = document.getElementById('submissionCounterText');
+            if (el && total > 0) {
+                el.textContent = submitted + ' of ' + total + ' teams submitted';
+            }
+        }
+
+        function showResultsView(roundData, myResult) {
+            var container = document.getElementById('resultsContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+            container.style.display = 'block';
+
+            // Hide waiting/scoring status sections
+            var waitSec = document.getElementById('waitingSection');
+            if (waitSec) waitSec.style.display = 'none';
+            var scoreBanner = document.getElementById('scoringStatusBanner');
+            if (scoreBanner) scoreBanner.style.display = 'none';
+            var counterEl = document.getElementById('submissionCounter');
+            if (counterEl) counterEl.style.display = 'none';
+
+            // --- Your Score ---
+            if (myResult) {
+                var scoreBox = document.createElement('div');
+                scoreBox.style.cssText = 'text-align:center; padding:20px; margin-bottom:15px; background:linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05)); border:1px solid rgba(255,215,0,0.3); border-radius:12px;';
+
+                var scoreNum = document.createElement('div');
+                scoreNum.style.cssText = 'font-size:2.5em; font-weight:bold; color:#ffd700;';
+                scoreNum.textContent = myResult.score + ' / ' + roundData.num_answers;
+                scoreBox.appendChild(scoreNum);
+
+                var rankText = document.createElement('div');
+                rankText.style.cssText = 'font-size:1em; color:#ccc; margin-top:5px;';
+                rankText.textContent = ordinal(myResult.rank) + ' of ' + myResult.total_teams + ' teams';
+                scoreBox.appendChild(rankText);
+
+                container.appendChild(scoreBox);
+
+                // --- Your Answers with match indicators ---
+                var checkedSet = new Set();
+                if (myResult.checked_answers) {
+                    myResult.checked_answers.split(',').forEach(function(n) {
+                        if (n.trim()) checkedSet.add(parseInt(n.trim()));
+                    });
+                }
+
+                var matchBox = document.createElement('div');
+                matchBox.style.cssText = 'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var matchHeading = document.createElement('h3');
+                matchHeading.style.cssText = 'color:#999; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                matchHeading.textContent = 'Your Answers';
+                matchBox.appendChild(matchHeading);
+
+                var matchList = document.createElement('div');
+                matchList.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+                for (var i = 1; i <= (myNumAnswers || roundData.num_answers); i++) {
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; gap:10px;';
+
+                    var icon = document.createElement('span');
+                    var isMatch = checkedSet.has(i);
+                    icon.style.cssText = 'width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.85em; flex-shrink:0;';
+                    if (isMatch) {
+                        icon.style.background = 'rgba(40,167,69,0.3)';
+                        icon.style.color = '#28a745';
+                        icon.textContent = '\u2713';
+                    } else {
+                        icon.style.background = 'rgba(220,53,69,0.2)';
+                        icon.style.color = '#dc3545';
+                        icon.textContent = '\u2717';
+                    }
+
+                    var ansText = document.createElement('span');
+                    ansText.style.cssText = 'font-size:1em;';
+                    ansText.style.color = isMatch ? '#28a745' : '#999';
+                    ansText.textContent = mySubmittedAnswers['answer' + i] || '(blank)';
+
+                    row.appendChild(icon);
+                    row.appendChild(ansText);
+                    matchList.appendChild(row);
+                }
+                matchBox.appendChild(matchList);
+                container.appendChild(matchBox);
+            }
+
+            // --- Survey Answers (on the board) ---
+            if (roundData.survey_answers && roundData.survey_answers.length > 0) {
+                var surveyBox = document.createElement('div');
+                surveyBox.style.cssText = 'background:rgba(255,215,0,0.08); border:1px solid rgba(255,215,0,0.25); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var surveyHeading = document.createElement('h3');
+                surveyHeading.style.cssText = 'color:#ffd700; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                surveyHeading.textContent = 'Answers on the Board';
+                surveyBox.appendChild(surveyHeading);
+
+                var surveyList = document.createElement('div');
+                surveyList.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+                for (var j = 0; j < roundData.survey_answers.length; j++) {
+                    var sRow = document.createElement('div');
+                    sRow.style.cssText = 'display:flex; align-items:center; gap:10px;';
+                    var sNum = document.createElement('span');
+                    sNum.style.cssText = 'background:rgba(255,215,0,0.25); color:#ffd700; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; font-size:0.85em;';
+                    sNum.textContent = (j + 1);
+                    var sAns = document.createElement('span');
+                    sAns.style.cssText = 'color:#eee; font-size:1em;';
+                    sAns.textContent = roundData.survey_answers[j];
+                    sRow.appendChild(sNum);
+                    sRow.appendChild(sAns);
+                    surveyList.appendChild(sRow);
+                }
+                surveyBox.appendChild(surveyList);
+                container.appendChild(surveyBox);
+            }
+
+            // --- Leaderboard ---
+            if (roundData.leaderboard && roundData.leaderboard.length > 0) {
+                var lbBox = document.createElement('div');
+                lbBox.style.cssText = 'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:20px; margin-bottom:15px;';
+                var lbHeading = document.createElement('h3');
+                lbHeading.style.cssText = 'color:#999; margin-bottom:15px; font-size:1em; font-weight:normal;';
+                lbHeading.textContent = 'Leaderboard';
+                lbBox.appendChild(lbHeading);
+
+                var lbList = document.createElement('div');
+                lbList.style.cssText = 'display:flex; flex-direction:column; gap:6px;';
+                var teamName = '{{ team_name|e }}';
+                for (var k = 0; k < roundData.leaderboard.length; k++) {
+                    var entry = roundData.leaderboard[k];
+                    var lbRow = document.createElement('div');
+                    lbRow.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:8px;';
+
+                    var isMe = entry.team_name === teamName;
+                    if (entry.is_winner) {
+                        lbRow.style.background = 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.08))';
+                        lbRow.style.border = '1px solid rgba(255,215,0,0.3)';
+                    } else if (isMe) {
+                        lbRow.style.background = 'rgba(100,149,237,0.15)';
+                        lbRow.style.border = '1px solid rgba(100,149,237,0.3)';
+                    } else {
+                        lbRow.style.background = 'rgba(255,255,255,0.03)';
+                    }
+
+                    var leftSide = document.createElement('div');
+                    leftSide.style.cssText = 'display:flex; align-items:center; gap:10px;';
+
+                    var rankBadge = document.createElement('span');
+                    rankBadge.style.cssText = 'font-weight:bold; font-size:0.9em; min-width:24px;';
+                    rankBadge.style.color = entry.rank === 1 ? '#ffd700' : '#999';
+                    rankBadge.textContent = entry.is_winner ? '\uD83C\uDFC6' : '#' + entry.rank;
+
+                    var nameSpan = document.createElement('span');
+                    nameSpan.style.cssText = 'font-size:1em;';
+                    nameSpan.style.color = isMe ? '#6495ed' : '#ccc';
+                    nameSpan.style.fontWeight = isMe ? 'bold' : 'normal';
+                    nameSpan.textContent = entry.team_name + (isMe ? ' (you)' : '');
+
+                    leftSide.appendChild(rankBadge);
+                    leftSide.appendChild(nameSpan);
+
+                    var scoreSpan = document.createElement('span');
+                    scoreSpan.style.cssText = 'font-weight:bold; font-size:1.1em;';
+                    scoreSpan.style.color = entry.is_winner ? '#ffd700' : '#ccc';
+                    scoreSpan.textContent = entry.score + ' pts';
+
+                    lbRow.appendChild(leftSide);
+                    lbRow.appendChild(scoreSpan);
+                    lbList.appendChild(lbRow);
+                }
+                lbBox.appendChild(lbList);
+                container.appendChild(lbBox);
+            }
+
+            // --- Waiting for next round footer ---
+            var footWait = document.createElement('div');
+            footWait.style.cssText = 'text-align:center; padding:15px 0; color:#999; font-size:0.9em;';
+            footWait.innerHTML = '<div class="loading" style="margin:0 auto 10px;"></div>Waiting for next round...';
+            container.appendChild(footWait);
+        }
+
+        function ordinal(n) {
+            var s = ['th','st','nd','rd'];
+            var v = n % 100;
+            return n + (s[(v-20)%10] || s[v] || s[0]);
         }
 
         var winnerShown = false;
@@ -1427,6 +1865,22 @@
                     var dot = document.getElementById('connectionDot');
                     if (dot) { dot.classList.remove('disconnected'); dot.title = 'Connected'; }
                 }
+
+                // Sync submission count and results on reconnect
+                if (data.has_active_round && data.already_submitted) {
+                    fetch('/api/submission-count')
+                        .then(r => r.json())
+                        .then(d => {
+                            if (typeof updateSubmissionCounter === 'function') updateSubmissionCounter(d.submitted, d.total);
+                        }).catch(() => {});
+                    fetch('/api/round-results')
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.has_results && typeof showResultsView === 'function') {
+                                showResultsView(d, d.my_result);
+                            }
+                        }).catch(() => {});
+                }
             } catch (e) {
                 console.warn('[WS] Reconnect sync failed:', e);
             }
@@ -1497,6 +1951,34 @@
             console.log('[WS] sleep:toggled', data);
             if (data.is_sleeping) {
                 window.location.reload();
+            }
+        });
+
+        // --- Submission count (live progress) ---
+        socket.on('submission:count', (data) => {
+            console.log('[WS] submission:count', data);
+            if (typeof updateSubmissionCounter === 'function') {
+                updateSubmissionCounter(data.submitted, data.total);
+            }
+        });
+
+        // --- Round results (leaderboard + survey answers) ---
+        var pendingRoundData = null;
+        var pendingMyResult = null;
+
+        socket.on('round:results', (data) => {
+            console.log('[WS] round:results', data);
+            pendingRoundData = data;
+            if (pendingMyResult !== null && typeof showResultsView === 'function') {
+                showResultsView(pendingRoundData, pendingMyResult);
+            }
+        });
+
+        socket.on('round:your_results', (data) => {
+            console.log('[WS] round:your_results', data);
+            pendingMyResult = data;
+            if (pendingRoundData !== null && typeof showResultsView === 'function') {
+                showResultsView(pendingRoundData, pendingMyResult);
             }
         });
 

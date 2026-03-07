@@ -25,6 +25,59 @@ from ai import save_correction_to_history, extract_single_scorecard, extract_ans
 scoring_bp = Blueprint('scoring', __name__)
 
 
+def _emit_round_results(conn, round_id, winner_code):
+    """Broadcast round results (leaderboard, survey answers, per-team matches) to all teams."""
+    round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+    if not round_info:
+        return
+
+    num_answers = round_info['num_answers']
+
+    # Build survey answers list
+    survey_answers = []
+    for i in range(1, num_answers + 1):
+        ans = round_info[f'answer{i}']
+        if ans:
+            survey_answers.append(ans)
+
+    # Build leaderboard from all scored submissions
+    all_subs = conn.execute("""
+        SELECT s.code, s.score, s.tiebreaker, s.checked_answers, tc.team_name
+        FROM submissions s
+        JOIN team_codes tc ON s.code = tc.code
+        WHERE s.round_id = ?
+        ORDER BY s.score DESC, s.tiebreaker DESC
+    """, (round_id,)).fetchall()
+
+    leaderboard = []
+    for rank, sub in enumerate(all_subs, 1):
+        leaderboard.append({
+            'team_name': sub['team_name'],
+            'score': sub['score'],
+            'rank': rank,
+            'is_winner': sub['code'] == winner_code
+        })
+
+    # Broadcast leaderboard + survey answers to all teams
+    socketio.emit('round:results', {
+        'round_id': round_id,
+        'leaderboard': leaderboard,
+        'survey_answers': survey_answers,
+        'num_answers': num_answers
+    }, to='teams')
+
+    # Send each team their personal results
+    for rank, sub in enumerate(all_subs, 1):
+        socketio.emit('round:your_results', {
+            'score': sub['score'],
+            'rank': rank,
+            'checked_answers': sub['checked_answers'] or '',
+            'total_teams': len(all_subs)
+        }, to=f"team:{sub['code']}")
+
+    logger.info(f"[SCORING] Emitted round:results to teams for round_id={round_id} ({len(all_subs)} teams)")
+
+
 def run_ai_scoring_for_submission(submission_id, auto_accept=False):
     """Shared helper: run AI scoring for a submission and persist results to DB.
 
@@ -400,6 +453,9 @@ def score_team(submission_id):
                 }, to='hosts')
 
                 logger.info(f"[SCORING] WINNER: code={winner['code']}, score={winner['score']} for round_id={submission['round_id']}")
+
+                # Broadcast round results to all teams
+                _emit_round_results(conn, submission['round_id'], winner['code'])
 
     # Check if AJAX request
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':

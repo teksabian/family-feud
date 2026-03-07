@@ -127,6 +127,91 @@ def api_broadcast_message():
         # Legacy format - just a plain string
         return jsonify({'message': broadcast_json, 'timestamp': 0})
 
+@api_bp.route('/api/submission-count')
+def api_submission_count():
+    """Submission progress for active round. Reconnect-sync fallback for submission:count WS event."""
+    code = session.get('code')
+    if not code:
+        return jsonify({'error': 'No code in session'}), 401
+
+    with db_connect() as conn:
+        active_round = conn.execute("SELECT id FROM rounds WHERE is_active = 1").fetchone()
+        if not active_round:
+            return jsonify({'submitted': 0, 'total': 0})
+
+        submitted = conn.execute(
+            "SELECT COUNT(*) FROM submissions WHERE round_id = ?", (active_round['id'],)
+        ).fetchone()[0]
+        total = conn.execute(
+            "SELECT COUNT(*) FROM team_codes WHERE used = 1 AND team_name IS NOT NULL"
+        ).fetchone()[0]
+
+        return jsonify({'submitted': submitted, 'total': total})
+
+
+@api_bp.route('/api/round-results')
+def api_round_results():
+    """Round results (leaderboard + survey answers + personal matches). Reconnect-sync fallback for round:results WS event."""
+    code = session.get('code')
+    if not code:
+        return jsonify({'error': 'No code in session'}), 401
+
+    with db_connect() as conn:
+        active_round = conn.execute("SELECT * FROM rounds WHERE is_active = 1").fetchone()
+        if not active_round:
+            return jsonify({'has_results': False})
+
+        # Only return results if all submissions are scored
+        total_subs = conn.execute(
+            "SELECT COUNT(*) FROM submissions WHERE round_id = ?", (active_round['id'],)
+        ).fetchone()[0]
+        scored_subs = conn.execute(
+            "SELECT COUNT(*) FROM submissions WHERE round_id = ? AND host_submitted = 1", (active_round['id'],)
+        ).fetchone()[0]
+
+        if total_subs == 0 or scored_subs < total_subs:
+            return jsonify({'has_results': False})
+
+        num_answers = active_round['num_answers']
+        survey_answers = [active_round[f'answer{i}'] for i in range(1, num_answers + 1) if active_round[f'answer{i}']]
+
+        all_subs = conn.execute("""
+            SELECT s.code, s.score, s.tiebreaker, s.checked_answers, tc.team_name
+            FROM submissions s
+            JOIN team_codes tc ON s.code = tc.code
+            WHERE s.round_id = ?
+            ORDER BY s.score DESC, s.tiebreaker DESC
+        """, (active_round['id'],)).fetchall()
+
+        winner_code = active_round['winner_code']
+        leaderboard = []
+        my_result = None
+        for rank, sub in enumerate(all_subs, 1):
+            entry = {
+                'team_name': sub['team_name'],
+                'score': sub['score'],
+                'rank': rank,
+                'is_winner': sub['code'] == winner_code
+            }
+            leaderboard.append(entry)
+            if sub['code'] == code:
+                my_result = {
+                    'score': sub['score'],
+                    'rank': rank,
+                    'checked_answers': sub['checked_answers'] or '',
+                    'total_teams': len(all_subs)
+                }
+
+        return jsonify({
+            'has_results': True,
+            'round_id': active_round['id'],
+            'leaderboard': leaderboard,
+            'survey_answers': survey_answers,
+            'num_answers': num_answers,
+            'my_result': my_result
+        })
+
+
 @api_bp.route('/api/view-status/<code>')
 def api_view_status(code):
     """View-only status for client reconnect-sync. Primary updates via WebSocket."""

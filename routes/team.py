@@ -406,6 +406,18 @@ def submit_answers():
             unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
 
+            # Notify all teams of submission progress
+            submitted_count = conn.execute(
+                "SELECT COUNT(*) FROM submissions WHERE round_id = ?", (round_id,)
+            ).fetchone()[0]
+            total_teams = conn.execute(
+                "SELECT COUNT(*) FROM team_codes WHERE used = 1 AND team_name IS NOT NULL"
+            ).fetchone()[0]
+            socketio.emit('submission:count', {
+                'submitted': submitted_count,
+                'total': total_teams
+            }, to='teams')
+
             logger.info(f"[TEAM] submit_answers() - submission saved for code={code}, round_id={round_id}, tiebreaker={tiebreaker}, answers={answers}")
 
             # Auto AI Scoring: trigger in background thread if enabled
