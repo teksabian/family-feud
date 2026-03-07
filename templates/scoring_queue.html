@@ -1294,52 +1294,43 @@
             return false;
         }
 
-        // ==================== UNSCORED COUNT POLLING ====================
-        async function updateUnscoredCount() {
-            try {
-                const response = await fetch('/host/count-unscored');
-                const data = await response.json();
+        // ==================== UNSCORED COUNT UPDATE ====================
+        function applyUnscoredCount(count) {
+            const countSpan = document.getElementById('unscoredCount');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const leftCounter = document.getElementById('leftCounter');
 
-                const countSpan = document.getElementById('unscoredCount');
-                const refreshBtn = document.getElementById('refreshBtn');
-                const leftCounter = document.getElementById('leftCounter');
+            if (countSpan && count !== undefined) {
+                countSpan.textContent = count;
 
-                if (countSpan && data.count !== undefined) {
-                    countSpan.textContent = data.count;
+                if (count > 0) {
+                    refreshBtn.style.background = 'var(--success)';
+                    refreshBtn.style.color = 'white';
+                } else {
+                    refreshBtn.style.background = '#333';
+                    refreshBtn.style.color = '#fff';
+                }
 
-                    if (data.count > 0) {
-                        refreshBtn.style.background = 'var(--success)';
-                        refreshBtn.style.color = 'white';
+                // Auto-reload when new submissions arrive (for auto AI scoring)
+                if (count > lastKnownUnscoredCount && autoAiScoringEnabled) {
+                    if (!unsavedChanges) {
+                        console.log('[AUTO-AI] New submissions detected, reloading to trigger auto-scoring');
+                        window.location.reload();
+                        return;
                     } else {
-                        refreshBtn.style.background = '#333';
-                        refreshBtn.style.color = '#fff';
-                    }
-
-                    // Auto-reload when new submissions arrive (for auto AI scoring)
-                    if (data.count > lastKnownUnscoredCount && autoAiScoringEnabled) {
-                        if (!unsavedChanges) {
-                            console.log('[AUTO-AI] New submissions detected, reloading to trigger auto-scoring');
-                            window.location.reload();
-                            return;
-                        } else {
-                            if (typeof showToast === 'function') {
-                                showToast('New submissions received — refresh when ready', 'info', 5000);
-                            }
+                        if (typeof showToast === 'function') {
+                            showToast('New submissions received — refresh when ready', 'info', 5000);
                         }
                     }
-
-                    lastKnownUnscoredCount = data.count;
                 }
 
-                if (leftCounter) {
-                    leftCounter.textContent = `${data.count}/${totalTeams} left`;
-                }
-            } catch (error) {
-                console.error('Failed to update unscored count:', error);
+                lastKnownUnscoredCount = count;
+            }
+
+            if (leftCounter) {
+                leftCounter.textContent = `${count}/${totalTeams} left`;
             }
         }
-
-        setInterval(updateUnscoredCount, 5000);
 
         function checkForUnsaved() {
             if (unsavedChanges) {
@@ -1924,5 +1915,30 @@
     </script>
 
     {% include '_toast.html' %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        socket.on('connect', async () => {
+            console.log('[WS] Connected, transport:', socket.io.engine.transport.name);
+            try {
+                const res = await fetch('/host/count-unscored');
+                const data = await res.json();
+                applyUnscoredCount(data.count);
+            } catch (e) {
+                console.warn('[WS] Reconnect sync failed:', e);
+            }
+        });
+
+        socket.on('scoring:count', (data) => {
+            console.log('[WS] scoring:count', data.unscored_count);
+            applyUnscoredCount(data.unscored_count);
+        });
+
+        socket.on('scoring:submission_scored', (data) => {
+            console.log('[WS] scoring:submission_scored', data);
+        });
+    </script>
 </body>
 </html>

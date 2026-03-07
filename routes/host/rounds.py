@@ -309,12 +309,14 @@ def activate_round(round_id):
                 "SELECT id, round_number, question, num_answers FROM rounds WHERE id = ?",
                 (round_id,)
             ).fetchone()
-            socketio.emit('round:started', {
+            round_started_data = {
                 'round_id': round_info['id'],
                 'round_number': round_info['round_number'],
                 'question': round_info['question'],
                 'num_answers': round_info['num_answers']
-            }, to='teams')
+            }
+            socketio.emit('round:started', round_started_data, to='teams')
+            socketio.emit('round:started', round_started_data, to='hosts')
 
             logger.info(f"[ROUND] activate_round() - round_id={round_id} now active (deactivated all others)")
             flash(f'\u2705 Round activated: {round_data["question"]}', 'success')
@@ -396,12 +398,14 @@ def start_next_round():
             if next_round:
                 conn.execute("UPDATE rounds SET is_active = 1 WHERE id = ?", (next_round['id'],))
                 conn.commit()
-                socketio.emit('round:started', {
+                round_started_data = {
                     'round_id': next_round['id'],
                     'round_number': next_round['round_number'],
                     'question': next_round['question'],
                     'num_answers': next_round['num_answers']
-                }, to='teams')
+                }
+                socketio.emit('round:started', round_started_data, to='teams')
+                socketio.emit('round:started', round_started_data, to='hosts')
                 logger.info(f"[ROUND] Activated round {current_num + 1} (id={next_round['id']})")
             else:
                 # No more rounds - game over
@@ -548,6 +552,7 @@ def close_round():
         conn.execute("UPDATE rounds SET submissions_closed = 1 WHERE id = ?", (active_round['id'],))
         conn.commit()
         socketio.emit('round:closed', {'round_id': active_round['id']}, to='teams')
+        socketio.emit('round:closed', {'round_id': active_round['id']}, to='hosts')
 
         # Count submissions
         sub_count = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",

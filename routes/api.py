@@ -7,12 +7,12 @@ These endpoints serve as reconnect-sync fallbacks; primary updates are via WebSo
 """
 
 import json
-from datetime import datetime
 from flask import Blueprint, jsonify, session
 
 from config import logger, STARTUP_ID, reset_state
 from auth import host_required
 from database import db_connect, get_setting
+from sockets import get_online_teams
 
 api_bp = Blueprint('api', __name__)
 
@@ -22,14 +22,10 @@ api_bp = Blueprint('api', __name__)
 def get_team_status():
     """Get status of all teams (online/offline) for host dashboard. Primary updates via WebSocket."""
     logger.debug("[API] get_team_status() called")
+    online = get_online_teams()
     with db_connect() as conn:
         teams = conn.execute("""
-            SELECT code, team_name, used, last_heartbeat,
-                   CASE
-                       WHEN last_heartbeat IS NULL THEN 0
-                       WHEN (julianday('now') - julianday(last_heartbeat)) * 86400 <= 15 THEN 1
-                       ELSE 0
-                   END as is_online
+            SELECT code, team_name, used
             FROM team_codes
             ORDER BY code
         """).fetchall()
@@ -37,26 +33,7 @@ def get_team_status():
         result = []
         for team in teams:
             team_dict = dict(team)
-            # Calculate last seen time
-            if team['last_heartbeat']:
-                try:
-                    last_seen = datetime.fromisoformat(team['last_heartbeat'].replace('Z', '+00:00'))
-                    now = datetime.now(last_seen.tzinfo) if last_seen.tzinfo else datetime.now()
-                    seconds_ago = int((now - last_seen).total_seconds())
-
-                    if seconds_ago < 60:
-                        team_dict['last_seen_text'] = f"{seconds_ago} seconds ago"
-                    elif seconds_ago < 3600:
-                        minutes = seconds_ago // 60
-                        team_dict['last_seen_text'] = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-                    else:
-                        hours = seconds_ago // 3600
-                        team_dict['last_seen_text'] = f"{hours} hour{'s' if hours != 1 else ''} ago"
-                except:
-                    team_dict['last_seen_text'] = "Unknown"
-            else:
-                team_dict['last_seen_text'] = "Never"
-
+            team_dict['is_online'] = 1 if team['code'] in online else 0
             result.append(team_dict)
 
         online_count = sum(1 for t in result if t.get('is_online'))

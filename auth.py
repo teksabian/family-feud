@@ -23,12 +23,10 @@ def configure_session(app):
 
 @auth_bp.before_app_request
 def log_request():
-    """Log incoming requests - skip static files and high-frequency polling"""
+    """Log incoming requests - skip static files and quiet paths"""
     if request.path.startswith('/static'):
         return
     if request.path in QUIET_PATHS:
-        return
-    if request.path.startswith('/api/view-status/'):
         return
     code = session.get('code', '-')
     team = session.get('team_name', '-')
@@ -40,10 +38,7 @@ def host_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('host_authenticated'):
-            if request.path in QUIET_PATHS:
-                logger.debug(f"[HOST] Auth check FAILED for {request.path} - redirecting to login")
-            else:
-                logger.info(f"[HOST] Auth check FAILED for {request.path} - redirecting to login")
+            logger.info(f"[HOST] Auth check FAILED for {request.path} - redirecting to login")
             return redirect(url_for('auth.host_login'))
         logger.debug(f"[HOST] Auth check passed for {request.path}")
         return f(*args, **kwargs)
@@ -57,8 +52,7 @@ def team_session_valid(f):
         # CRITICAL: Check reset_counter and startup_id BEFORE checking if session exists
         # This ensures Game Over page shows even if session was cleared
 
-        # Use DEBUG for polling endpoints to avoid log noise
-        log = logger.debug if request.path in QUIET_PATHS else logger.info
+        log = logger.info
 
         # Check if startup_id in session matches current server startup
         # If server restarted, STARTUP_ID changes = all old sessions invalid

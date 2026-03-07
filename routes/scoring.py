@@ -361,12 +361,14 @@ def score_team(submission_id):
                     "SELECT team_name FROM team_codes WHERE code = ?",
                     (winner['code'],)
                 ).fetchone()
-                socketio.emit('round:ended', {
+                round_ended_data = {
                     'round_id': submission['round_id'],
                     'winner_code': winner['code'],
                     'winner_team': winner_team['team_name'] if winner_team else 'Unknown',
                     'winner_score': winner['score']
-                }, to='teams')
+                }
+                socketio.emit('round:ended', round_ended_data, to='teams')
+                socketio.emit('round:ended', round_ended_data, to='hosts')
 
                 logger.info(f"[SCORING] WINNER: code={winner['code']}, score={winner['score']} for round_id={submission['round_id']}")
 

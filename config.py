@@ -329,17 +329,10 @@ THEMES = {
 }
 
 # ===== REQUEST LOGGING =====
-# Polling endpoints that fire every 5s per client - never log these
+# Endpoints to suppress from debug logs. With WebSocket push, most former
+# polling endpoints are now only hit on reconnect-sync (infrequent).
 QUIET_PATHS = frozenset([
-    '/api/heartbeat',
-    '/api/check-round-status',
-    '/api/broadcast-message',
-    '/host/codes-status',
-    '/host/check-active-round',
-    '/host/count-unscored',
-    '/host/team-status',
     '/host/get-sleep-status',
-    '/host/photo-scan/team-count',
 ])
 
 # ===== AI PROMPT CONSTANTS =====
