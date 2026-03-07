@@ -403,7 +403,7 @@ def submit_answers():
             conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
             conn.commit()
 
-            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
 
             logger.info(f"[TEAM] submit_answers() - submission saved for code={code}, round_id={round_id}, tiebreaker={tiebreaker}, answers={answers}")

@@ -120,7 +120,7 @@ def run_ai_scoring_for_submission(submission_id, auto_accept=False):
 
             conn.commit()
 
-            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
 
             logger.info(f"[AI-SCORING] Result for submission {submission_id}: matches={matches}, reasoning_count={len(reasoning)}")
@@ -151,7 +151,7 @@ def scoring_queue():
             FROM submissions s
             JOIN team_codes tc ON s.code = tc.code
             WHERE s.round_id = ?
-            ORDER BY s.scored ASC, s.submitted_at ASC
+            ORDER BY s.host_submitted ASC, s.submitted_at ASC
         """, (active_round['id'],)).fetchall()
 
         submissions_data = []
@@ -174,6 +174,8 @@ def scoring_queue():
                     auto_checks = {i: (i in ai_match_list) for i in range(1, active_round['num_answers'] + 1)}
                 else:
                     auto_checks = {i: False for i in range(1, active_round['num_answers'] + 1)}
+
+            if not sub_dict.get('host_submitted'):
                 unscored_count += 1
 
             sub_dict['auto_checks'] = auto_checks
@@ -201,7 +203,7 @@ def count_unscored():
 
         count = conn.execute("""
             SELECT COUNT(*) as cnt FROM submissions
-            WHERE round_id = ? AND scored = 0
+            WHERE round_id = ? AND host_submitted = 0
         """, (active_round['id'],)).fetchone()['cnt']
         logger.debug(f"[API] count_unscored() = {count}")
         return jsonify({'count': count})
@@ -254,7 +256,7 @@ def score_team(submission_id):
 
         conn.execute("""
             UPDATE submissions
-            SET score = ?, scored = 1, scored_at = CURRENT_TIMESTAMP, checked_answers = ?, previous_score = ?
+            SET score = ?, scored = 1, host_submitted = 1, scored_at = CURRENT_TIMESTAMP, checked_answers = ?, previous_score = ?
             WHERE id = ?
         """, (score, checked_answers_str, current_score, submission_id))
 
@@ -352,7 +354,7 @@ def score_team(submission_id):
 
         conn.commit()
 
-        unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+        unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
         socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
         socketio.emit('scoring:submission_scored', {
             'submission_id': submission_id,
@@ -363,7 +365,7 @@ def score_team(submission_id):
         # Check if all submissions for this round are scored
         total_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",
                                    (submission['round_id'],)).fetchone()['cnt']
-        scored_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND scored = 1",
+        scored_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND host_submitted = 1",
                                     (submission['round_id'],)).fetchone()['cnt']
 
         logger.info(f"[SCORING] Round progress: {scored_subs}/{total_subs} teams scored")
@@ -460,7 +462,7 @@ def undo_score(submission_id):
         previous_score = submission['previous_score']
         conn.execute("""
             UPDATE submissions
-            SET score = ?, previous_score = NULL
+            SET score = ?, previous_score = NULL, host_submitted = 0
             WHERE id = ?
         """, (previous_score, submission_id))
         conn.commit()
@@ -806,7 +808,7 @@ def manual_entry_submit():
             conn.execute(f"INSERT INTO submissions ({', '.join(fields)}) VALUES ({placeholders})", values)
             conn.commit()
 
-            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
             socketio.emit('team:joined', {'code': code, 'team_name': team_name}, to='hosts')
             codes = conn.execute("SELECT code, used, team_name FROM team_codes ORDER BY id ASC").fetchall()
@@ -1017,7 +1019,7 @@ def photo_scan_upload():
 
         conn.commit()
 
-        unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+        unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
         socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
 
     succeeded = sum(1 for r in results if r['success'])
@@ -1200,7 +1202,7 @@ def photo_scan_submit_reviewed():
                             (pending_name_update, code))
             conn.commit()
 
-            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE scored = 0").fetchone()[0]
+            unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
             codes = conn.execute("SELECT code, used, team_name FROM team_codes ORDER BY id ASC").fetchall()
             codes_data = [{'code': c['code'], 'used': bool(c['used']), 'team_name': c['team_name']} for c in codes]

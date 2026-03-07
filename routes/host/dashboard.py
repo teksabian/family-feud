@@ -64,7 +64,7 @@ def host_dashboard():
         if active_round:
             unscored_count = conn.execute("""
                 SELECT COUNT(*) as cnt FROM submissions
-                WHERE round_id = ? AND scored = 0
+                WHERE round_id = ? AND host_submitted = 0
             """, (active_round['id'],)).fetchone()['cnt']
 
             # Total submissions for active round

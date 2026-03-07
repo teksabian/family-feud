@@ -820,13 +820,13 @@
             margin-left: 8px;
         }
 
-        /* Scored teams: read-only checkboxes */
-        .team-panel[data-scored="1"] .checkbox-row {
+        /* Submitted teams: read-only checkboxes */
+        .team-panel[data-host-submitted="1"] .checkbox-row {
             cursor: default;
             opacity: 0.7;
         }
 
-        .team-panel[data-scored="1"] .checkbox-row:hover {
+        .team-panel[data-host-submitted="1"] .checkbox-row:hover {
             background: rgba(255,255,255,0.05);
         }
     </style>
@@ -888,6 +888,7 @@
         <div class="team-panel" id="panel-{{ sub.id }}"
              data-index="{{ loop.index0 }}"
              data-scored="{{ sub.scored }}"
+             data-host-submitted="{{ sub.host_submitted }}"
              data-submission-id="{{ sub.id }}"
              data-team-name="{{ sub.team_name if sub.team_name else '[Deleted Team]' }}"
              data-team-code="{{ sub.code }}"
@@ -1068,21 +1069,21 @@
         }
 
         function nextUnscoredTeam() {
-            // Find next unscored team after current index
+            // Find next unsubmitted team after current index
             for (let i = currentIndex + 1; i < totalTeams; i++) {
-                if (panels[i].dataset.scored === '0') {
+                if (panels[i].dataset.hostSubmitted === '0') {
                     showTeam(i);
                     return true;
                 }
             }
             // Wrap around: search from beginning
             for (let i = 0; i < currentIndex; i++) {
-                if (panels[i].dataset.scored === '0') {
+                if (panels[i].dataset.hostSubmitted === '0') {
                     showTeam(i);
                     return true;
                 }
             }
-            return false; // all scored
+            return false; // all submitted
         }
 
         function updateNavBar() {
@@ -1092,6 +1093,7 @@
             const teamCode = panel.dataset.teamCode;
             const submittedTime = panel.dataset.submittedTime;
             const isScored = panel.dataset.scored === '1';
+            const isSubmitted = panel.dataset.hostSubmitted === '1';
 
             // Update name and team code
             document.getElementById('navTeamCode').textContent = teamCode;
@@ -1100,13 +1102,10 @@
             // Update badges
             const badgesEl = document.getElementById('navBadges');
             let badgesHtml = '';
-            if (isScored) {
-                // Check if AI scored
-                if (aiScoredSubmissions.has(parseInt(subId))) {
-                    badgesHtml = '<span class="badge badge-ai-scored">&#129302; AI SCORED</span>';
-                } else {
-                    badgesHtml = '<span class="badge badge-scored">&#10003; SCORED</span>';
-                }
+            if (isSubmitted) {
+                badgesHtml = '<span class="badge badge-scored">&#10003; SUBMITTED</span>';
+            } else if (isScored) {
+                badgesHtml = '<span class="badge badge-ai-scored">&#129302; AI SCORED</span>';
             }
             badgesEl.innerHTML = badgesHtml;
 
@@ -1120,7 +1119,7 @@
 
             // Compute current score for this team
             let currentScore = 0;
-            if (isScored) {
+            if (isSubmitted) {
                 currentScore = parseInt(panel.dataset.score) || 0;
             } else {
                 const form = document.getElementById(`form-${subId}`);
@@ -1159,11 +1158,11 @@
                     <div class="score-value">${currentScore}/${Math.round(maxScore)}</div>
                 </div>
                 <button type="submit"
-                        class="submit-btn ${isScored ? 'scored' : ''}"
+                        class="submit-btn ${isSubmitted ? 'scored' : ''}"
                         id="submit-btn-${subId}"
-                        ${isScored ? 'disabled' : ''}
+                        ${isSubmitted ? 'disabled' : ''}
                         onclick="document.getElementById('form-${subId}').dispatchEvent(new Event('submit', {cancelable: true}))">
-                    ${isScored ? '&#10003; SCORED' : '&#9989; SUBMIT'}
+                    ${isSubmitted ? '&#10003; SUBMITTED' : '&#9989; SUBMIT'}
                 </button>
             `;
 
@@ -1188,7 +1187,7 @@
         // ==================== SCORING ====================
         function toggleCheckbox(subId, ansNum, numAnswers) {
             const panel = document.getElementById(`panel-${subId}`);
-            if (panel && panel.dataset.scored === '1') return;
+            if (panel && panel.dataset.hostSubmitted === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             cb.checked = !cb.checked;
             onCheckboxChange(subId, ansNum, numAnswers);
@@ -1196,7 +1195,7 @@
 
         function onCheckboxChange(subId, ansNum, numAnswers) {
             const panel = document.getElementById(`panel-${subId}`);
-            if (panel && panel.dataset.scored === '1') return;
+            if (panel && panel.dataset.hostSubmitted === '1') return;
             const cb = document.getElementById(`cb-${subId}-${ansNum}`);
             const row = document.getElementById(`cb-row-${subId}-${ansNum}`);
             row.classList.toggle('checked', cb.checked);
@@ -1247,9 +1246,10 @@
                     const data = await response.json();
                     unsavedChanges = false;
 
-                    // Mark panel as scored
+                    // Mark panel as submitted
                     const panel = document.getElementById(`panel-${submissionId}`);
                     panel.dataset.scored = '1';
+                    panel.dataset.hostSubmitted = '1';
                     panel.dataset.score = data.score;
 
                     // Update nav bar (shows SCORED button, badges)
@@ -1782,7 +1782,7 @@
             if (!autoAiScoringEnabled || !aiScoringEnabled) return;
             for (const panel of panels) {
                 if (!autoAiScoringEnabled) break; // stop if toggled off mid-run
-                if (panel.dataset.scored === '0') {
+                if (panel.dataset.hostSubmitted === '0') {
                     const subId = parseInt(panel.dataset.submissionId);
                     if (!aiScoredSubmissions.has(subId) && !aiThinkingSubmissions.has(subId)) {
                         await scoreWithAIQuiet(subId, maxAnswers);
@@ -1863,10 +1863,10 @@
         // ==================== INITIALIZATION ====================
         document.addEventListener('DOMContentLoaded', function() {
             if (totalTeams > 0) {
-                // Start on first unscored team
+                // Start on first unsubmitted team
                 let startIndex = 0;
                 for (let i = 0; i < totalTeams; i++) {
-                    if (panels[i].dataset.scored === '0') {
+                    if (panels[i].dataset.hostSubmitted === '0') {
                         startIndex = i;
                         break;
                     }

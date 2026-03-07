@@ -575,7 +575,7 @@ def close_round():
 
         # Check if all submissions are already scored
         unscored_count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND scored = 0",
+            "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND host_submitted = 0",
             (active_round['id'],)
         ).fetchone()['cnt']
 
