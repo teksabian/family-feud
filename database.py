@@ -17,9 +17,6 @@ def db_connect():
     logger.debug("[DB] Opening database connection")
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
-    # Production SQLite settings for concurrent writes
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -59,6 +56,10 @@ def ensure_fixed_codes():
 
 def init_db():
     with db_connect() as conn:
+        # Database-level PRAGMAs — persist for the file, only need to run once
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS team_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

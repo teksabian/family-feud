@@ -789,7 +789,7 @@
             document.getElementById('broadcast-banner').style.display = 'none';
         }
 
-        const socket = io();
+        const socket = io({ transports: ['websocket'] });
 
         socket.on('broadcast:message', (data) => {
             const banner = document.getElementById('broadcast-banner');
@@ -924,7 +924,7 @@
             document.getElementById('winner-interstitial').style.display = 'block';
         }
 
-        const socket = io();
+        const socket = io({ transports: ['websocket'] });
 
         socket.on('broadcast:message', (data) => {
             const banner = document.getElementById('broadcast-banner');
@@ -1040,7 +1040,7 @@
             document.getElementById('winner-interstitial').style.display = 'block';
         }
 
-        const socket = io();
+        const socket = io({ transports: ['websocket'] });
 
         socket.on('broadcast:message', (data) => {
             const banner = document.getElementById('broadcast-banner');
@@ -1525,7 +1525,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         // ======== WEBSOCKET EVENT LISTENERS ========
-        var socket = io();
+        var socket = io({ transports: ['websocket'] });
 
         socket.on('broadcast:message', function(data) {
             var banner = document.getElementById('broadcast-banner');
@@ -1580,21 +1580,23 @@
             console.log('[WS] Connected');
             var dot = document.getElementById('connectionDot');
             if (dot) { dot.classList.remove('disconnected'); dot.title = 'Connected'; }
-            // Reconnect sync
-            fetch('/api/check-round-status')
-                .then(function(res) {
-                    if (res.status === 401) { window.location.reload(); return; }
-                    return res.json();
-                })
-                .then(function(data) {
-                    if (!data) return;
-                    var currentRoundId = {{ round_id }};
-                    if (!data.has_active_round || data.round_id !== currentRoundId) {
-                        saveAnswers();
-                        window.location.reload();
-                    }
-                })
-                .catch(function(e) { console.warn('[WS] Reconnect sync failed:', e); });
+            // Reconnect sync (jittered to avoid thundering herd)
+            setTimeout(function() {
+                fetch('/api/check-round-status')
+                    .then(function(res) {
+                        if (res.status === 401) { window.location.reload(); return; }
+                        return res.json();
+                    })
+                    .then(function(data) {
+                        if (!data) return;
+                        var currentRoundId = {{ round_id }};
+                        if (!data.has_active_round || data.round_id !== currentRoundId) {
+                            saveAnswers();
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function(e) { console.warn('[WS] Reconnect sync failed:', e); });
+            }, Math.floor(Math.random() * 2000));
         });
 
         socket.on('disconnect', function() {

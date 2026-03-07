@@ -1497,7 +1497,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        const socket = io();
+        const socket = io({ transports: ['websocket'] });
 
         socket.on('codes:updated', (data) => { applyCodesData(data); });
 
@@ -1521,20 +1521,23 @@
         socket.on('round:started', () => { location.reload(); });
         socket.on('round:ended', () => { location.reload(); });
 
-        socket.on('connect', async () => {
+        socket.on('connect', () => {
             console.log('[WS] Host connected');
-            try {
-                const [codesRes, teamRes{% if active_round %}, unscoredRes{% endif %}] = await Promise.all([
-                    fetch('/host/codes-status'),
-                    fetch('/host/team-status'){% if active_round %},
-                    fetch('/host/count-unscored'){% endif %}
-                ]);
-                applyCodesData(await codesRes.json());
-                applyTeamStatus(await teamRes.json());
-                {% if active_round %}
-                applyUnscoredCount(await unscoredRes.json());
-                {% endif %}
-            } catch (e) { console.warn('[WS] Reconnect sync failed:', e); }
+            // Reconnect sync (jittered to avoid thundering herd)
+            setTimeout(async () => {
+                try {
+                    const [codesRes, teamRes{% if active_round %}, unscoredRes{% endif %}] = await Promise.all([
+                        fetch('/host/codes-status'),
+                        fetch('/host/team-status'){% if active_round %},
+                        fetch('/host/count-unscored'){% endif %}
+                    ]);
+                    applyCodesData(await codesRes.json());
+                    applyTeamStatus(await teamRes.json());
+                    {% if active_round %}
+                    applyUnscoredCount(await unscoredRes.json());
+                    {% endif %}
+                } catch (e) { console.warn('[WS] Reconnect sync failed:', e); }
+            }, Math.floor(Math.random() * 2000));
         });
     </script>
     
