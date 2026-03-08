@@ -309,6 +309,11 @@
             <button onclick="window.location.href='/host/scoring-queue'" class="btn-secondary">
                 📝 Back to Scoring Queue
             </button>
+            <form method="POST" action="/host/reveal-leaderboard" style="margin: 0; display: inline;">
+                <button type="submit" class="btn-secondary" style="background: #ffd700; color: #000;">
+                    👀 Reveal Names
+                </button>
+            </form>
             <form method="POST" action="/host/start-next-round" style="margin: 0; display: inline;">
                 <button type="submit" class="btn-success">
                     ▶️ Start Next Round

@@ -6,7 +6,7 @@ from flask import request, render_template, redirect, url_for, jsonify, flash
 
 from config import logger, BASE_DIR
 from auth import host_required
-from database import db_connect, get_setting
+from database import db_connect, get_setting, set_setting
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
 
@@ -588,3 +588,23 @@ def close_round():
             return redirect(url_for('scoring.scored_teams'))
 
         return redirect(url_for('scoring.scoring_queue'))
+
+
+@host_bp.route('/host/reveal-leaderboard', methods=['POST'])
+@host_required
+def reveal_leaderboard():
+    """Reveal real team names on the player leaderboard."""
+    from routes.scoring import _emit_round_reveal
+
+    with db_connect() as conn:
+        active_round = conn.execute("SELECT id, round_number FROM rounds WHERE is_active = 1").fetchone()
+        if not active_round:
+            flash('No active round!', 'error')
+            return redirect(url_for('host.host_dashboard'))
+
+        _emit_round_reveal(conn, active_round['id'])
+        set_setting(f"leaderboard_revealed_{active_round['id']}", 'true', 'Leaderboard names revealed')
+        logger.info(f"[ROUND] Host revealed leaderboard for round {active_round['round_number']}")
+        flash('Leaderboard revealed to all teams!', 'success')
+
+    return redirect(url_for('scoring.scored_teams'))

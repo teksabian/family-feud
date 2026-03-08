@@ -7,12 +7,20 @@ These endpoints serve as reconnect-sync fallbacks; primary updates are via WebSo
 """
 
 import json
+import random
 from flask import Blueprint, jsonify, session
 
 from config import logger, STARTUP_ID, reset_state
 from auth import host_required
 from database import db_connect, get_setting
 from sockets import get_online_teams
+
+_ANON_ALIASES = [
+    'Mystery Team', 'Shadow Squad', 'Hidden Heroes', 'Secret Society',
+    'Unknown Alliance', 'Phantom Force', 'Masked Marvels', 'Stealth Squad',
+    'Ghost Crew', 'Enigma Gang', 'Covert Ops', 'Dark Horses',
+    'Wild Cards', 'Undercover Unit', 'Rogue Agents', 'Incognito Inc.',
+]
 
 api_bp = Blueprint('api', __name__)
 
@@ -184,11 +192,22 @@ def api_round_results():
         """, (active_round['id'],)).fetchall()
 
         winner_code = active_round['winner_code']
+        revealed = get_setting(f"leaderboard_revealed_{active_round['id']}", 'false') == 'true'
+
+        # Use seeded shuffle so aliases are consistent across polls for same round
+        aliases = list(_ANON_ALIASES[:len(all_subs)])
+        rng = random.Random(active_round['id'])
+        rng.shuffle(aliases)
+
         leaderboard = []
         my_result = None
         for rank, sub in enumerate(all_subs, 1):
+            if revealed:
+                display_name = sub['team_name']
+            else:
+                display_name = aliases[rank - 1] if rank - 1 < len(aliases) else f'Team {rank}'
             entry = {
-                'team_name': sub['team_name'],
+                'team_name': display_name,
                 'score': sub['score'],
                 'rank': rank,
                 'is_winner': sub['code'] == winner_code
@@ -208,7 +227,8 @@ def api_round_results():
             'leaderboard': leaderboard,
             'survey_answers': survey_answers,
             'num_answers': num_answers,
-            'my_result': my_result
+            'my_result': my_result,
+            'revealed': revealed
         })
 
 

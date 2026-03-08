@@ -11,6 +11,7 @@ import base64
 import sqlite3
 import secrets
 import string
+import random
 import threading
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -25,8 +26,16 @@ from ai import save_correction_to_history, extract_single_scorecard, extract_ans
 scoring_bp = Blueprint('scoring', __name__)
 
 
+_ANON_ALIASES = [
+    'Mystery Team', 'Shadow Squad', 'Hidden Heroes', 'Secret Society',
+    'Unknown Alliance', 'Phantom Force', 'Masked Marvels', 'Stealth Squad',
+    'Ghost Crew', 'Enigma Gang', 'Covert Ops', 'Dark Horses',
+    'Wild Cards', 'Undercover Unit', 'Rogue Agents', 'Incognito Inc.',
+]
+
+
 def _emit_round_results(conn, round_id, winner_code):
-    """Broadcast round results (leaderboard, survey answers, per-team matches) to all teams."""
+    """Broadcast round results with anonymized team names. Real names revealed later by host."""
     round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
     if not round_info:
         return
@@ -49,6 +58,63 @@ def _emit_round_results(conn, round_id, winner_code):
         ORDER BY s.score DESC, s.tiebreaker DESC
     """, (round_id,)).fetchall()
 
+    # Assign shuffled anonymous aliases
+    aliases = list(_ANON_ALIASES[:len(all_subs)])
+    random.shuffle(aliases)
+
+    leaderboard = []
+    for rank, sub in enumerate(all_subs, 1):
+        leaderboard.append({
+            'team_name': aliases[rank - 1] if rank - 1 < len(aliases) else f'Team {rank}',
+            'score': sub['score'],
+            'rank': rank,
+            'is_winner': sub['code'] == winner_code
+        })
+
+    # Broadcast anonymized leaderboard to all teams
+    socketio.emit('round:results', {
+        'round_id': round_id,
+        'leaderboard': leaderboard,
+        'survey_answers': survey_answers,
+        'num_answers': num_answers,
+        'revealed': False
+    }, to='teams')
+
+    # Send each team their personal results (they know their own score/rank but not others)
+    for rank, sub in enumerate(all_subs, 1):
+        socketio.emit('round:your_results', {
+            'score': sub['score'],
+            'rank': rank,
+            'checked_answers': sub['checked_answers'] or '',
+            'total_teams': len(all_subs)
+        }, to=f"team:{sub['code']}")
+
+    logger.info(f"[SCORING] Emitted anonymized round:results to teams for round_id={round_id} ({len(all_subs)} teams)")
+
+
+def _emit_round_reveal(conn, round_id):
+    """Broadcast real team names to all teams (host-triggered reveal)."""
+    round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+    if not round_info:
+        return
+
+    winner_code = round_info['winner_code']
+    num_answers = round_info['num_answers']
+
+    survey_answers = []
+    for i in range(1, num_answers + 1):
+        ans = round_info[f'answer{i}']
+        if ans:
+            survey_answers.append(ans)
+
+    all_subs = conn.execute("""
+        SELECT s.code, s.score, s.tiebreaker, tc.team_name
+        FROM submissions s
+        JOIN team_codes tc ON s.code = tc.code
+        WHERE s.round_id = ?
+        ORDER BY s.score DESC, s.tiebreaker DESC
+    """, (round_id,)).fetchall()
+
     leaderboard = []
     for rank, sub in enumerate(all_subs, 1):
         leaderboard.append({
@@ -58,24 +124,15 @@ def _emit_round_results(conn, round_id, winner_code):
             'is_winner': sub['code'] == winner_code
         })
 
-    # Broadcast leaderboard + survey answers to all teams
     socketio.emit('round:results', {
         'round_id': round_id,
         'leaderboard': leaderboard,
         'survey_answers': survey_answers,
-        'num_answers': num_answers
+        'num_answers': num_answers,
+        'revealed': True
     }, to='teams')
 
-    # Send each team their personal results
-    for rank, sub in enumerate(all_subs, 1):
-        socketio.emit('round:your_results', {
-            'score': sub['score'],
-            'rank': rank,
-            'checked_answers': sub['checked_answers'] or '',
-            'total_teams': len(all_subs)
-        }, to=f"team:{sub['code']}")
-
-    logger.info(f"[SCORING] Emitted round:results to teams for round_id={round_id} ({len(all_subs)} teams)")
+    logger.info(f"[SCORING] Emitted round:reveal to teams for round_id={round_id} ({len(all_subs)} teams)")
 
 
 def run_ai_scoring_for_submission(submission_id, auto_accept=False):
