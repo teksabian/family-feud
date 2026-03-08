@@ -296,6 +296,12 @@ def team_play():
             # Get last_submission from session (for answer preview)
             last_submission = session.pop('last_submission', None)
 
+            # Submission counter data
+            submission_count = conn.execute(
+                "SELECT COUNT(*) FROM submissions WHERE round_id = ?",
+                (active_round['id'],)
+            ).fetchone()[0]
+
             return render_template('play.html',
                                  team_name=team_name,
                                  code=code,
@@ -305,7 +311,8 @@ def team_play():
                                  already_submitted=True,
                                  submissions_closed=active_round['submissions_closed'],
                                  submission=dict(submission),
-                                 last_submission=last_submission)
+                                 last_submission=last_submission,
+                                 submission_count=submission_count)
 
     logger.debug(f"[TEAM] team_play() - round {active_round['round_number']}, showing answer form ({active_round['num_answers']} answers)")
     return render_template('play.html',
@@ -406,6 +413,14 @@ def submit_answers():
             unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
             socketio.emit('scoring:count', {'unscored_count': unscored}, to='hosts')
 
+            # Broadcast submission count to all teams
+            submission_count = conn.execute(
+                "SELECT COUNT(*) FROM submissions WHERE round_id = ?", (round_id,)
+            ).fetchone()[0]
+            socketio.emit('submission:count', {
+                'submitted': submission_count
+            }, to='teams')
+
             logger.info(f"[TEAM] submit_answers() - submission saved for code={code}, round_id={round_id}, tiebreaker={tiebreaker}, answers={answers}")
 
             # Auto AI Scoring: trigger in background thread if enabled
@@ -443,7 +458,11 @@ def submit_answers():
             }
 
             if is_ajax:
-                return jsonify({'success': True, 'answers': answers, 'tiebreaker': tiebreaker, 'num_answers': num_answers})
+                return jsonify({
+                    'success': True, 'answers': answers, 'tiebreaker': tiebreaker,
+                    'num_answers': num_answers,
+                    'submission_count': submission_count
+                })
         except sqlite3.IntegrityError:
             # Fallback: UNIQUE constraint caught it
             logger.warning(f"[TEAM] submit_answers() - UNIQUE constraint caught duplicate from code={code}")

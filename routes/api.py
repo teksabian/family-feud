@@ -75,12 +75,19 @@ def check_round_status():
                 (code, active_round['id'])
             ).fetchone()
 
+            # Submission and team counts for live counter
+            submission_count = conn.execute(
+                "SELECT COUNT(*) FROM submissions WHERE round_id = ?",
+                (active_round['id'],)
+            ).fetchone()[0]
+
             result = {
                 'has_active_round': True,
                 'round_id': active_round['id'],
                 'round_number': active_round['round_number'],
                 'submissions_closed': bool(active_round['submissions_closed']),
-                'already_submitted': submission is not None
+                'already_submitted': submission is not None,
+                'submission_count': submission_count
             }
 
             # Include previous round's winner (for winner interstitial on round transition)
