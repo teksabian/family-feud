@@ -129,6 +129,7 @@ def settings():
     ai_scoring_enabled = get_setting('ai_scoring_enabled', 'true') == 'true'
     extended_thinking_enabled = get_setting('extended_thinking_enabled', 'false') == 'true'
     thinking_budget_tokens = int(get_setting('thinking_budget_tokens', '10000'))
+    mobile_experience = get_setting('mobile_experience', 'advanced_no_pp')
 
     # Count corrections in current session
     corrections_count = len(load_corrections_history())
@@ -137,6 +138,7 @@ def settings():
                          qr_base_url=current_qr_url,
                          allow_team_registration=allow_team_registration,
                          system_paused=system_paused,
+                         mobile_experience=mobile_experience,
                          broadcast_message=broadcast_message,
                          ai_scoring_available=AI_SCORING_ENABLED,
                          ai_scoring_enabled=ai_scoring_enabled,
@@ -190,6 +192,19 @@ def toggle_setting():
             else:
                 flash('\ud83e\udd16 Auto AI Scoring disabled', 'success')
 
+    return redirect(url_for('.settings'))
+
+
+@host_bp.route('/host/set-mobile-experience', methods=['POST'])
+@host_required
+def set_mobile_experience():
+    """Set the mobile experience mode"""
+    mode = request.form.get('mode', 'advanced_no_pp')
+    if mode in ('basic', 'advanced_no_pp', 'advanced_pp'):
+        set_setting('mobile_experience', mode, 'Mobile experience mode for team screens')
+        labels = {'basic': 'Basic', 'advanced_no_pp': 'Advanced (No PP Display)', 'advanced_pp': 'Advanced (PP Display)'}
+        flash(f'Mobile experience set to: {labels.get(mode, mode)}', 'success')
+        logger.info(f"[SETTINGS] set_mobile_experience() - mode={mode}")
     return redirect(url_for('.settings'))
 
 

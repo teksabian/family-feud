@@ -777,6 +777,7 @@
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page refreshes automatically...</p>
             </div>
 
+            {% if mobile_experience != 'basic' %}
             <!-- Live Leaderboard -->
             <div id="leaderboard-container" style="display: none; margin-top: 20px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
@@ -785,11 +786,13 @@
                 </div>
                 <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
             </div>
+            {% endif %}
         </div>
     </div>
 
     <script>
         const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
 
         function renderLeaderboard(leaderboard) {
             const container = document.getElementById('leaderboard-container');
@@ -824,7 +827,7 @@
                     '">' + entry.rank + '</span>' +
                     '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
                     (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
-                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + entry.total_score + '</span>';
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
                 fragment.appendChild(row);
             });
             list.innerHTML = '';
@@ -867,6 +870,7 @@
             
             <p style="color: var(--success); font-size: 1em; text-align: center; margin: 0;">✅ Submitted</p>
 
+            {% if mobile_experience != 'basic' %}
             <!-- Live Leaderboard -->
             <div id="leaderboard-container" style="display: none; margin-top: 15px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
@@ -876,6 +880,11 @@
                 <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
             </div>
 
+            <div class="waiting" style="padding: 20px 0;">
+                <div class="loading"></div>
+                <p>Survey Says...</p>
+            </div>
+            {% else %}
             {% if submissions_closed %}
             <div style="padding: 20px; background: rgba(220,53,69,0.2); border: 2px solid #dc3545; border-radius: 10px; margin: 20px 0;">
                 <h3 style="color: #dc3545; margin-bottom: 10px;">⏰ Round Has Ended</h3>
@@ -891,6 +900,7 @@
                 <p>Waiting for next round...</p>
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page will refresh automatically</p>
             </div>
+            {% endif %}
             {% endif %}
 
             <!-- Winner Interstitial (shown via JS on round transition) -->
@@ -909,6 +919,7 @@
     <script>
         let winnerShown = false;
         const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
 
         function renderLeaderboard(leaderboard) {
             const container = document.getElementById('leaderboard-container');
@@ -937,7 +948,7 @@
                     '">' + entry.rank + '</span>' +
                     '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
                     (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
-                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + entry.total_score + '</span>';
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
                 fragment.appendChild(row);
             });
             list.innerHTML = '';
@@ -1001,6 +1012,7 @@
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page refreshes automatically...</p>
             </div>
 
+            {% if mobile_experience != 'basic' %}
             <!-- Live Leaderboard -->
             <div id="leaderboard-container" style="display: none; margin-top: 20px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
@@ -1009,6 +1021,7 @@
                 </div>
                 <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
             </div>
+            {% endif %}
 
             <!-- Winner Interstitial (shown via JS on round transition) -->
             <div id="winner-interstitial" class="winner-interstitial">
@@ -1026,6 +1039,7 @@
     <script>
         let winnerShown = false;
         const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
 
         function renderLeaderboard(leaderboard) {
             const container = document.getElementById('leaderboard-container');
@@ -1054,7 +1068,7 @@
                     '">' + entry.rank + '</span>' +
                     '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
                     (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
-                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + entry.total_score + '</span>';
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
                 fragment.appendChild(row);
             });
             list.innerHTML = '';
@@ -1294,6 +1308,7 @@
         }
 
         const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
 
         function renderLeaderboard(leaderboard) {
             const container = document.getElementById('leaderboard-container');
@@ -1322,7 +1337,7 @@
                     '">' + entry.rank + '</span>' +
                     '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
                     (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
-                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + entry.total_score + '</span>';
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
                 fragment.appendChild(row);
             });
             list.innerHTML = '';
@@ -1346,42 +1361,60 @@
             successDiv.appendChild(checkP);
             wrapper.appendChild(successDiv);
 
-            // Leaderboard container (populated by WebSocket + fetch)
-            var lbContainer = document.createElement('div');
-            lbContainer.id = 'leaderboard-container';
-            lbContainer.style.cssText = 'display:none; margin-top:15px;';
-            var lbHeader = document.createElement('div');
-            lbHeader.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;';
-            lbHeader.innerHTML = '<span style="font-size:1.1em; font-weight:bold; color:var(--text-primary, #fff);">Leaderboard</span>' +
-                '<span style="font-size:0.7em; padding:2px 8px; background:rgba(76,175,80,0.25); color:#4caf50; border:1px solid rgba(76,175,80,0.4); border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">Live</span>';
-            lbContainer.appendChild(lbHeader);
-            var lbList = document.createElement('div');
-            lbList.id = 'leaderboard-list';
-            lbList.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
-            lbContainer.appendChild(lbList);
-            wrapper.appendChild(lbContainer);
+            if (mobileExperience !== 'basic') {
+                // Leaderboard container (populated by WebSocket + fetch)
+                var lbContainer = document.createElement('div');
+                lbContainer.id = 'leaderboard-container';
+                lbContainer.style.cssText = 'display:none; margin-top:15px;';
+                var lbHeader = document.createElement('div');
+                lbHeader.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;';
+                lbHeader.innerHTML = '<span style="font-size:1.1em; font-weight:bold; color:var(--text-primary, #fff);">Leaderboard</span>' +
+                    '<span style="font-size:0.7em; padding:2px 8px; background:rgba(76,175,80,0.25); color:#4caf50; border:1px solid rgba(76,175,80,0.4); border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">Live</span>';
+                lbContainer.appendChild(lbHeader);
+                var lbList = document.createElement('div');
+                lbList.id = 'leaderboard-list';
+                lbList.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+                lbContainer.appendChild(lbList);
+                wrapper.appendChild(lbContainer);
 
-            // Fetch leaderboard immediately
-            fetch('/api/leaderboard')
-                .then(function(r) { return r.json(); })
-                .then(function(d) { if (d.leaderboard && typeof renderLeaderboard === 'function') renderLeaderboard(d.leaderboard); })
-                .catch(function() {});
+                // Fetch leaderboard immediately
+                fetch('/api/leaderboard')
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { if (d.leaderboard && typeof renderLeaderboard === 'function') renderLeaderboard(d.leaderboard); })
+                    .catch(function() {});
 
-            // Waiting message
-            var waitDiv = document.createElement('div');
-            waitDiv.className = 'waiting';
-            waitDiv.style.cssText = 'padding:20px 0;';
-            var loader = document.createElement('div');
-            loader.className = 'loading';
-            var waitP = document.createElement('p');
-            waitP.textContent = 'Waiting for next round...';
-            var waitP2 = document.createElement('p');
-            waitP2.style.cssText = 'font-size:0.85em; opacity:0.8; margin-top:10px;';
-            waitP2.textContent = 'This page will refresh automatically';
-            waitDiv.appendChild(loader);
-            waitDiv.appendChild(waitP);
-            waitDiv.appendChild(waitP2);
-            wrapper.appendChild(waitDiv);
+                // Survey Says waiting message
+                var waitDiv = document.createElement('div');
+                waitDiv.className = 'waiting';
+                waitDiv.style.cssText = 'padding:20px 0;';
+                var loader = document.createElement('div');
+                loader.className = 'loading';
+                var waitP = document.createElement('p');
+                waitP.textContent = 'Survey Says...';
+                waitDiv.appendChild(loader);
+                waitDiv.appendChild(waitP);
+                wrapper.appendChild(waitDiv);
+            } else {
+                // Basic mode: classic waiting message
+                var warnDiv = document.createElement('div');
+                warnDiv.className = 'warning';
+                warnDiv.textContent = '\u26A0\uFE0F Do not manually refresh the page';
+                wrapper.appendChild(warnDiv);
+                var waitDiv = document.createElement('div');
+                waitDiv.className = 'waiting';
+                waitDiv.style.cssText = 'padding:20px 0;';
+                var loader = document.createElement('div');
+                loader.className = 'loading';
+                var waitP = document.createElement('p');
+                waitP.textContent = 'Waiting for next round...';
+                var waitP2 = document.createElement('p');
+                waitP2.style.cssText = 'font-size:0.85em; opacity:0.8; margin-top:10px;';
+                waitP2.textContent = 'This page will refresh automatically';
+                waitDiv.appendChild(loader);
+                waitDiv.appendChild(waitP);
+                waitDiv.appendChild(waitP2);
+                wrapper.appendChild(waitDiv);
+            }
 
             // Hide progress indicator
             var progress = document.getElementById('answerProgress');

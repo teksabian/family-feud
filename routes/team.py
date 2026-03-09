@@ -13,6 +13,7 @@ from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED
 from auth import team_session_valid
 from database import db_connect, get_setting
 from extensions import socketio
+from routes.scoring import emit_leaderboard_update
 
 team_bp = Blueprint('team', __name__)
 
@@ -231,6 +232,7 @@ def join_submit():
         codes = conn.execute("SELECT code, used, team_name FROM team_codes ORDER BY id ASC").fetchall()
         codes_data = [{'code': c['code'], 'used': bool(c['used']), 'team_name': c['team_name']} for c in codes]
         socketio.emit('codes:updated', {'codes': codes_data}, to='hosts')
+        emit_leaderboard_update()
 
         logger.info(f"[TEAM] join_submit() - code '{code}' claimed by team '{team_name}', session created")
 
@@ -278,13 +280,15 @@ def team_play():
             conn.commit()
 
         active_round = conn.execute("SELECT * FROM rounds WHERE is_active = 1").fetchone()
+        mobile_experience = get_setting('mobile_experience', 'advanced_no_pp')
 
         if not active_round:
             logger.debug(f"[TEAM] team_play() - no active round, showing waiting screen")
             return render_template('play.html',
                                  team_name=team_name,
                                  code=code,
-                                 no_active_round=True)
+                                 no_active_round=True,
+                                 mobile_experience=mobile_experience)
 
         submission = conn.execute("""
             SELECT * FROM submissions
@@ -312,7 +316,8 @@ def team_play():
                                  submissions_closed=active_round['submissions_closed'],
                                  submission=dict(submission),
                                  last_submission=last_submission,
-                                 submission_count=submission_count)
+                                 submission_count=submission_count,
+                                 mobile_experience=mobile_experience)
 
     logger.debug(f"[TEAM] team_play() - round {active_round['round_number']}, showing answer form ({active_round['num_answers']} answers)")
     return render_template('play.html',
@@ -322,7 +327,8 @@ def team_play():
                          question=active_round['question'],
                          num_answers=active_round['num_answers'],
                          round_id=active_round['id'],
-                         submissions_closed=active_round['submissions_closed'])
+                         submissions_closed=active_round['submissions_closed'],
+                         mobile_experience=mobile_experience)
 
 
 @team_bp.route('/play/submit', methods=['POST'])

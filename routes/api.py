@@ -142,10 +142,11 @@ def api_leaderboard():
         return jsonify({'error': 'No code in session'}), 401
 
     with db_connect() as conn:
-        # All registered teams with cumulative scores (0 for unscored)
+        # All registered teams with cumulative scores and pending status
         teams = conn.execute("""
             SELECT tc.team_name, tc.code,
-                   COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score
+                   COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score,
+                   MAX(CASE WHEN s.host_submitted = 1 THEN 1 ELSE 0 END) as has_been_scored
             FROM team_codes tc
             LEFT JOIN submissions s ON tc.code = s.code
             WHERE tc.used = 1 AND tc.team_name IS NOT NULL
@@ -159,7 +160,8 @@ def api_leaderboard():
                 'team_name': row['team_name'],
                 'total_score': row['total_score'],
                 'rank': i + 1,
-                'is_you': row['code'] == code
+                'is_you': row['code'] == code,
+                'pending': not row['has_been_scored']
             })
 
         return jsonify({'leaderboard': leaderboard})
