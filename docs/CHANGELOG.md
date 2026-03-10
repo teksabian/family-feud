@@ -4,6 +4,11 @@ All notable changes to Family Feud (Pub Feud) are documented here. Reverse chron
 
 ---
 
+## v4.1.0 - Plasma (Mar 10, 2026)
+- AI-powered round generation with survey totals summing to 93-97
+- Compressed host dashboard UI for less wasted space
+- Removed redundant Settings buttons
+
 ## v4.0.0 - Plasma (Mar 7, 2026)
 - Separate AI scoring from host submission with new `host_submitted` column
 - AI auto-scored submissions keep SUBMIT button enabled for host review

@@ -88,7 +88,7 @@ logging.getLogger().addFilter(_sio_filter)
 logger.info(f"Log level: {logging.getLevelName(log_level)} (set LOG_LEVEL=DEBUG for verbose output)")
 
 # ===== APP CONSTANTS =====
-APP_VERSION = "v4.0.0 - Plasma"
+APP_VERSION = "v4.1.0 - Plasma"
 
 # Use environment variable for secret key in production, generate random for local dev
 SECRET_KEY = os.environ.get('SECRET_KEY', secrets.token_hex(32))
