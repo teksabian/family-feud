@@ -1568,8 +1568,8 @@
                 const teamsData = await teamRes.json();
                 const unscoredData = await unscoredRes.json();
 
-                // Sync codes
-                if (typeof refreshCodes === 'function') refreshCodes();
+                // Sync codes (must await so DOM is rebuilt before applying team status)
+                if (typeof refreshCodes === 'function') await refreshCodes();
 
                 // Sync team status
                 teamsData.forEach(team => {
@@ -1587,9 +1587,19 @@
             }
         });
 
-        socket.on('codes:updated', (data) => {
+        socket.on('codes:updated', async (data) => {
             console.log('[WS] codes:updated');
-            if (typeof refreshCodes === 'function') refreshCodes();
+            if (typeof refreshCodes === 'function') await refreshCodes();
+            // Re-apply team online status after DOM rebuild
+            try {
+                const res = await fetch('/host/team-status');
+                const teams = await res.json();
+                teams.forEach(team => {
+                    if (team.used && typeof applyTeamOnlineStatus === 'function') {
+                        applyTeamOnlineStatus(team.code, team.is_online);
+                    }
+                });
+            } catch (e) {}
         });
 
         socket.on('scoring:count', (data) => {
