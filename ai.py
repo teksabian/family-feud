@@ -10,6 +10,8 @@ import os
 import json
 from difflib import SequenceMatcher
 
+import re
+
 from config import (
     logger,
     ANTHROPIC_AVAILABLE, ANTHROPIC_API_KEY, ANTHROPIC_READY,
@@ -93,6 +95,106 @@ def get_current_scoring_model():
         else:
             logger.warning(f"[AI] Unknown scoring model in database: '{db_value}', falling back to default")
     return AI_SCORING_MODEL_DEFAULT
+
+
+def get_current_generation_model():
+    """Get the AI model for round generation.
+    Priority: database setting > scoring model (fallback).
+    """
+    db_value = get_setting('ai_generation_model', '')
+    if db_value:
+        valid_ids = [m['id'] for m in AI_MODEL_CHOICES]
+        if db_value in valid_ids:
+            return db_value
+        else:
+            logger.warning(f"[AI] Unknown generation model in database: '{db_value}', falling back to scoring model")
+    return get_current_scoring_model()
+
+
+def _parse_json_response(text):
+    """Strip markdown fences and parse JSON from AI response text."""
+    # Strip markdown code fences
+    cleaned = re.sub(r'^```(?:json)?\s*\n?', '', text.strip())
+    cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Fallback: extract outermost { ... } block
+        brace_start = text.find('{')
+        brace_end = text.rfind('}')
+        if brace_start != -1 and brace_end != -1:
+            try:
+                return json.loads(text[brace_start:brace_end + 1])
+            except json.JSONDecodeError:
+                pass
+    return None
+
+
+def _call_ai_for_generation(prompt, max_tokens=4096):
+    """Call AI for creative generation (questions/answers), using temperature=1.0.
+
+    Returns the raw response text, or raises on error.
+    """
+    if not AI_SCORING_ENABLED:
+        raise RuntimeError("AI is not enabled")
+
+    model = get_current_generation_model()
+    provider = get_provider_for_model(model)
+    logger.info(f"[AI-GEN] Calling {provider} API (model: {model}, prompt length: {len(prompt)} chars)")
+
+    if provider == 'openai':
+        if not openai_client:
+            raise RuntimeError("OpenAI client not initialized")
+        # Use temperature=1.0 for creative generation where possible
+        if model in OPENAI_REASONING_MODELS:
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=max_tokens,
+                reasoning_effort='medium',
+            )
+        elif model in OPENAI_FIXED_TEMP_MODELS:
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=max_tokens,
+            )
+        else:
+            response = openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=max_tokens,
+                temperature=1.0,
+            )
+        return response.choices[0].message.content
+    else:
+        if not anthropic_client:
+            raise RuntimeError("Anthropic client not initialized")
+        # Build kwargs, override temperature to 1.0 for creativity
+        thinking_enabled = get_setting('extended_thinking_enabled', 'false') == 'true'
+        if thinking_enabled:
+            budget = int(get_setting('thinking_budget_tokens', '10000'))
+            budget = max(budget, 1024)
+            api_kwargs = {
+                'max_tokens': budget + max_tokens,
+                'thinking': {
+                    'type': 'enabled',
+                    'budget_tokens': budget,
+                },
+            }
+        else:
+            api_kwargs = {
+                'max_tokens': max_tokens,
+                'temperature': 1.0,
+            }
+        message = call_claude_api(
+            client=anthropic_client,
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            api_kwargs=api_kwargs
+        )
+        return extract_response_text(message)
+
 
 def build_claude_api_kwargs(max_tokens_default):
     """Build keyword arguments for client.messages.create() based on current settings.

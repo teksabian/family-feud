@@ -4,11 +4,19 @@ import os
 import time
 from flask import request, render_template, redirect, url_for, jsonify, flash
 
-from config import logger, BASE_DIR
+from config import (
+    logger, BASE_DIR,
+    AI_SCORING_ENABLED, AI_MODEL_CHOICES,
+    FEUD_QUESTIONS_PROMPT, FEUD_ANSWERS_PROMPT, FEUD_REGEN_QUESTION_PROMPT,
+)
 from auth import host_required
-from database import db_connect, get_setting
+from database import db_connect, get_setting, set_setting
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
+from ai import (
+    _call_ai_for_generation, _parse_json_response,
+    get_current_generation_model,
+)
 
 from routes.host import host_bp, ROUNDS_CONFIG
 
@@ -506,7 +514,10 @@ def create_round_manual_form():
     """Show manual round creation form"""
     return render_template('create_round_manual.html',
                          rounds_config=ROUNDS_CONFIG,
-                         prebuilt_surveys=PREBUILT_SURVEYS)
+                         prebuilt_surveys=PREBUILT_SURVEYS,
+                         ai_enabled=AI_SCORING_ENABLED,
+                         ai_model_choices=AI_MODEL_CHOICES,
+                         current_generation_model=get_current_generation_model() if AI_SCORING_ENABLED else '')
 
 @host_bp.route('/host/create-round-manual/submit', methods=['POST'])
 @host_required
@@ -565,6 +576,143 @@ def create_round_manual_submit():
     except Exception as e:
         logger.error(f"[ROUND] create_round_manual_submit() error: {e}")
         flash(f'Error creating rounds: {str(e)}', 'error'); return redirect(url_for('.host_dashboard'))
+
+@host_bp.route('/host/generate-questions', methods=['POST'])
+@host_required
+def generate_questions():
+    """Step 1: AI generates 8 survey questions."""
+    if not AI_SCORING_ENABLED:
+        return jsonify({'success': False, 'error': 'AI is not enabled'}), 400
+    try:
+        past_questions_block = ''
+        prompt = FEUD_QUESTIONS_PROMPT.format(past_questions_block=past_questions_block)
+        response_text = _call_ai_for_generation(prompt)
+        data = _parse_json_response(response_text)
+        if not data or 'questions' not in data:
+            logger.warning(f"[AI-GEN] Failed to parse questions response: {response_text[:500]}")
+            return jsonify({'success': False, 'error': 'Failed to parse AI response'}), 500
+        questions = data['questions']
+        if len(questions) != 8:
+            return jsonify({'success': False, 'error': f'Expected 8 questions, got {len(questions)}'}), 500
+        logger.info(f"[AI-GEN] Generated 8 questions successfully")
+        return jsonify({'success': True, 'questions': questions})
+    except Exception as e:
+        logger.error(f"[AI-GEN] generate_questions error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@host_bp.route('/host/generate-round-data', methods=['POST'])
+@host_required
+def generate_round_data():
+    """Step 2: AI generates answers + point values for 8 approved questions."""
+    if not AI_SCORING_ENABLED:
+        return jsonify({'success': False, 'error': 'AI is not enabled'}), 400
+    try:
+        body = request.get_json()
+        if not body or 'questions' not in body or len(body['questions']) != 8:
+            return jsonify({'success': False, 'error': 'Must provide exactly 8 questions'}), 400
+        questions = body['questions']
+
+        # Build questions_block with answer counts
+        lines = []
+        for idx, q in enumerate(questions):
+            config = ROUNDS_CONFIG[idx]
+            lines.append(f'{idx + 1}. "{q}" ({config["answers"]} answers)')
+        questions_block = '\n'.join(lines)
+
+        past_questions_block = ''
+        prompt = FEUD_ANSWERS_PROMPT.format(
+            questions_block=questions_block,
+            past_questions_block=past_questions_block,
+        )
+        response_text = _call_ai_for_generation(prompt)
+        data = _parse_json_response(response_text)
+        if not data or 'rounds' not in data:
+            logger.warning(f"[AI-GEN] Failed to parse round data response: {response_text[:500]}")
+            return jsonify({'success': False, 'error': 'Failed to parse AI response'}), 500
+
+        rounds = data['rounds']
+        if len(rounds) != 8:
+            return jsonify({'success': False, 'error': f'Expected 8 rounds, got {len(rounds)}'}), 500
+
+        # Validate each round
+        for idx, rd in enumerate(rounds):
+            config = ROUNDS_CONFIG[idx]
+            expected_answers = config['answers']
+            answers = rd.get('answers', [])
+            if len(answers) != expected_answers:
+                logger.warning(f"[AI-GEN] Round {idx+1}: expected {expected_answers} answers, got {len(answers)}")
+            # Validate answer structure
+            for ans in answers:
+                if 'text' not in ans or 'points' not in ans:
+                    return jsonify({'success': False, 'error': f'Round {idx+1}: answers must have "text" and "points"'}), 500
+            # Check points sum (lenient: 80-110)
+            total = sum(a['points'] for a in answers)
+            if total < 80 or total > 110:
+                logger.warning(f"[AI-GEN] Round {idx+1} points sum={total} (outside 80-110 range, but allowing)")
+
+        logger.info("[AI-GEN] Generated round data for 8 rounds successfully")
+        return jsonify({'success': True, 'feud_data': {'rounds': rounds}})
+    except Exception as e:
+        logger.error(f"[AI-GEN] generate_round_data error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@host_bp.route('/host/regenerate-feud-question', methods=['POST'])
+@host_required
+def regenerate_feud_question():
+    """Regenerate answers for a single question."""
+    if not AI_SCORING_ENABLED:
+        return jsonify({'success': False, 'error': 'AI is not enabled'}), 400
+    try:
+        body = request.get_json()
+        if not body:
+            return jsonify({'success': False, 'error': 'Missing request body'}), 400
+        question = body.get('question', '').strip()
+        num_answers = body.get('num_answers', 4)
+        existing_answers = body.get('existing_answers', [])
+
+        if not question:
+            return jsonify({'success': False, 'error': 'Question is required'}), 400
+
+        prompt = FEUD_REGEN_QUESTION_PROMPT.format(
+            question=question,
+            num_answers=num_answers,
+            existing_answers=', '.join(existing_answers) if existing_answers else 'None',
+        )
+        response_text = _call_ai_for_generation(prompt)
+        data = _parse_json_response(response_text)
+        if not data or 'answers' not in data:
+            logger.warning(f"[AI-GEN] Failed to parse regen response: {response_text[:500]}")
+            return jsonify({'success': False, 'error': 'Failed to parse AI response'}), 500
+
+        answers = data['answers']
+        for ans in answers:
+            if 'text' not in ans or 'points' not in ans:
+                return jsonify({'success': False, 'error': 'Answers must have "text" and "points"'}), 500
+
+        logger.info(f"[AI-GEN] Regenerated {len(answers)} answers for: {question[:60]}")
+        return jsonify({'success': True, 'question': question, 'answers': answers})
+    except Exception as e:
+        logger.error(f"[AI-GEN] regenerate_feud_question error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@host_bp.route('/host/set-ai-generation-model', methods=['POST'])
+@host_required
+def set_ai_generation_model():
+    """Save the AI model selection for round generation."""
+    body = request.get_json()
+    if not body or 'model' not in body:
+        return jsonify({'success': False, 'error': 'Missing model'}), 400
+    model_id = body['model']
+    valid_ids = [m['id'] for m in AI_MODEL_CHOICES]
+    if model_id not in valid_ids:
+        return jsonify({'success': False, 'error': f'Unknown model: {model_id}'}), 400
+    set_setting('ai_generation_model', model_id, 'AI model for round generation')
+    logger.info(f"[AI-GEN] Generation model set to: {model_id}")
+    return jsonify({'success': True})
+
 
 @host_bp.route('/host/close-round', methods=['POST'])
 @host_required

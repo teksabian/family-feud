@@ -283,6 +283,132 @@
             background: #e6c200;
             transform: translateY(-2px);
         }
+
+        /* AI Generation Panel */
+        .ai-panel {
+            background: linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(59,130,246,0.15) 100%);
+            border: 2px solid rgba(124,58,237,0.5);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ai-panel-header {
+            color: #a78bfa;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+
+        .ai-panel .ai-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .ai-panel select {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .ai-btn {
+            background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            width: auto;
+            white-space: nowrap;
+        }
+
+        .ai-btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        .ai-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ai-btn-secondary {
+            background: rgba(124,58,237,0.3);
+            border: 2px solid #7c3aed;
+        }
+
+        .ai-status {
+            color: var(--text);
+            margin-top: 10px;
+            font-size: 0.95em;
+            min-height: 1.5em;
+        }
+
+        .ai-review-panel {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .ai-review-panel .question-input {
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border: 2px solid rgba(124,58,237,0.4);
+            border-radius: 6px;
+            font-size: 1em;
+            background: rgba(255,255,255,0.95);
+            font-family: Arial, sans-serif;
+        }
+
+        .ai-review-panel label {
+            color: #a78bfa;
+            font-size: 0.95em;
+            margin-bottom: 4px;
+        }
+
+        .ai-review-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .generating-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .regen-btn {
+            background: rgba(124,58,237,0.3);
+            border: 1px solid #7c3aed;
+            color: #a78bfa;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            width: auto;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        .regen-btn:hover {
+            background: rgba(124,58,237,0.5);
+            transform: none;
+        }
     </style>
 </head>
 <body>
@@ -317,6 +443,52 @@
                 <option value="clear">Clear All Fields</option>
             </select>
         </div>
+
+        {% if ai_enabled %}
+        <div class="ai-panel">
+            <div class="ai-panel-header">AI Round Generation</div>
+            <div class="ai-row">
+                <select id="ai-model-select" onchange="saveGenerationModel()">
+                    {% set anthropic_models = ai_model_choices|selectattr('provider', 'equalto', 'anthropic')|list %}
+                    {% set openai_models = ai_model_choices|selectattr('provider', 'equalto', 'openai')|list %}
+                    {% if anthropic_models %}
+                    <optgroup label="Anthropic">
+                        {% for m in anthropic_models %}
+                        <option value="{{ m.id }}" {% if m.id == current_generation_model %}selected{% endif %}>{{ m.name }} — {{ m.description }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                    {% if openai_models %}
+                    <optgroup label="OpenAI">
+                        {% for m in openai_models %}
+                        <option value="{{ m.id }}" {% if m.id == current_generation_model %}selected{% endif %}>{{ m.name }} — {{ m.description }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                </select>
+                <button type="button" class="ai-btn" id="ai-generate-btn" onclick="generateQuestions()">
+                    AI Generate All Rounds
+                </button>
+            </div>
+            <div class="ai-status" id="ai-status"></div>
+
+            <div class="ai-review-panel" id="ai-review-panel">
+                <label>Review & Edit AI-Generated Questions:</label>
+                {% for config in rounds_config %}
+                <input type="text" class="question-input" id="ai-q{{ config.round }}"
+                       placeholder="Round {{ config.round }} question ({{ config.answers }} answers)">
+                {% endfor %}
+                <div class="ai-review-buttons">
+                    <button type="button" class="ai-btn" id="ai-answers-btn" onclick="generateAnswers()">
+                        Generate Answers
+                    </button>
+                    <button type="button" class="ai-btn ai-btn-secondary" onclick="generateQuestions()">
+                        New Questions
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
             <div class="submit-section">
                 <div class="button-row">
@@ -463,6 +635,216 @@
 
                 var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
                 if (countField) countField.value = '';
+            });
+            // Remove any regen buttons
+            document.querySelectorAll('.regen-btn').forEach(function(btn) { btn.remove(); });
+        }
+
+        /* ===== AI Generation Functions ===== */
+
+        function setAiStatus(msg, isError) {
+            var el = document.getElementById('ai-status');
+            if (el) {
+                el.innerHTML = msg;
+                el.style.color = isError ? '#f87171' : 'var(--text)';
+            }
+        }
+
+        function saveGenerationModel() {
+            var select = document.getElementById('ai-model-select');
+            if (!select) return;
+            fetch('/host/set-ai-generation-model', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({model: select.value})
+            });
+        }
+
+        function generateQuestions() {
+            var btn = document.getElementById('ai-generate-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="generating-spinner"></span> Generating questions...';
+            setAiStatus('Generating 8 survey questions...');
+
+            fetch('/host/generate-questions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.innerHTML = 'AI Generate All Rounds';
+                if (data.success) {
+                    var panel = document.getElementById('ai-review-panel');
+                    panel.style.display = 'block';
+                    data.questions.forEach(function(q, idx) {
+                        var input = document.getElementById('ai-q' + (idx + 1));
+                        if (input) input.value = q;
+                    });
+                    setAiStatus('8 questions generated! Review and edit below, then click "Generate Answers".');
+                } else {
+                    setAiStatus('Error: ' + (data.error || 'Unknown error'), true);
+                }
+            })
+            .catch(function(err) {
+                btn.disabled = false;
+                btn.innerHTML = 'AI Generate All Rounds';
+                setAiStatus('Network error: ' + err.message, true);
+            });
+        }
+
+        function generateAnswers() {
+            // Collect questions from review inputs
+            var questions = [];
+            for (var i = 1; i <= 8; i++) {
+                var input = document.getElementById('ai-q' + i);
+                var q = input ? input.value.trim() : '';
+                if (!q) {
+                    setAiStatus('Question ' + i + ' is empty. Please fill all 8 questions.', true);
+                    if (input) input.focus();
+                    return;
+                }
+                questions.push(q);
+            }
+
+            var btn = document.getElementById('ai-answers-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="generating-spinner"></span> Generating answers for 8 rounds...';
+            setAiStatus('Generating answers and point values for 8 rounds...');
+
+            fetch('/host/generate-round-data', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({questions: questions})
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.innerHTML = 'Generate Answers';
+                if (data.success) {
+                    fillFeudData(data.feud_data);
+                    document.getElementById('ai-review-panel').style.display = 'none';
+                    addRegenButtons();
+                    setAiStatus('All 8 rounds populated! Review the form below and click "Create All 8 Rounds".');
+                } else {
+                    setAiStatus('Error: ' + (data.error || 'Unknown error'), true);
+                }
+            })
+            .catch(function(err) {
+                btn.disabled = false;
+                btn.innerHTML = 'Generate Answers';
+                setAiStatus('Network error: ' + err.message, true);
+            });
+        }
+
+        function fillFeudData(feudData) {
+            feudData.rounds.forEach(function(rd, idx) {
+                var roundNum = idx + 1;
+                var config = ROUNDS_CONFIG[idx];
+                var numAnswers = config.answers;
+
+                // Set question
+                var qField = document.querySelector('[name="question' + roundNum + '"]');
+                if (qField) qField.value = rd.question;
+
+                // Set answers and points
+                var answers = rd.answers || [];
+                for (var i = 1; i <= numAnswers; i++) {
+                    var aField = document.querySelector('[name="round' + roundNum + '_answer' + i + '"]');
+                    if (aField && answers[i - 1]) {
+                        aField.value = answers[i - 1].text;
+                    }
+                }
+
+                // Set answer1_count to the #1 answer's points
+                var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
+                if (countField && answers[0]) {
+                    countField.value = answers[0].points;
+                }
+            });
+        }
+
+        function addRegenButtons() {
+            // Remove existing regen buttons first
+            document.querySelectorAll('.regen-btn').forEach(function(btn) { btn.remove(); });
+
+            ROUNDS_CONFIG.forEach(function(config) {
+                var roundNum = config.round;
+                var label = document.querySelector('label[for="question' + roundNum + '"]');
+                if (label && !label.querySelector('.regen-btn')) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'regen-btn';
+                    btn.title = 'Regenerate answers for this round';
+                    btn.textContent = '\uD83D\uDD04';
+                    btn.onclick = function() { regenerateQuestion(roundNum); };
+                    label.appendChild(btn);
+                }
+            });
+        }
+
+        function regenerateQuestion(roundNum) {
+            var config = ROUNDS_CONFIG[roundNum - 1];
+            var numAnswers = config.answers;
+            var qField = document.querySelector('[name="question' + roundNum + '"]');
+            var question = qField ? qField.value.trim() : '';
+            if (!question) {
+                alert('Round ' + roundNum + ' has no question.');
+                return;
+            }
+
+            // Collect existing answers from OTHER rounds to avoid duplicates
+            var existingAnswers = [];
+            ROUNDS_CONFIG.forEach(function(c) {
+                if (c.round === roundNum) return;
+                for (var i = 1; i <= c.answers; i++) {
+                    var f = document.querySelector('[name="round' + c.round + '_answer' + i + '"]');
+                    if (f && f.value.trim()) existingAnswers.push(f.value.trim());
+                }
+            });
+
+            // Find and disable the regen button
+            var label = document.querySelector('label[for="question' + roundNum + '"]');
+            var regenBtn = label ? label.querySelector('.regen-btn') : null;
+            if (regenBtn) {
+                regenBtn.disabled = true;
+                regenBtn.innerHTML = '<span class="generating-spinner" style="border-top-color:#a78bfa;border-color:rgba(167,139,250,0.3);width:12px;height:12px"></span>';
+            }
+
+            fetch('/host/regenerate-feud-question', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    question: question,
+                    num_answers: numAnswers,
+                    existing_answers: existingAnswers
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (regenBtn) {
+                    regenBtn.disabled = false;
+                    regenBtn.textContent = '\uD83D\uDD04';
+                }
+                if (data.success) {
+                    var answers = data.answers || [];
+                    for (var i = 1; i <= numAnswers; i++) {
+                        var f = document.querySelector('[name="round' + roundNum + '_answer' + i + '"]');
+                        if (f && answers[i - 1]) f.value = answers[i - 1].text;
+                    }
+                    var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
+                    if (countField && answers[0]) countField.value = answers[0].points;
+                    setAiStatus('Round ' + roundNum + ' answers regenerated!');
+                } else {
+                    setAiStatus('Error regenerating round ' + roundNum + ': ' + (data.error || 'Unknown'), true);
+                }
+            })
+            .catch(function(err) {
+                if (regenBtn) {
+                    regenBtn.disabled = false;
+                    regenBtn.textContent = '\uD83D\uDD04';
+                }
+                setAiStatus('Network error: ' + err.message, true);
             });
         }
     </script>

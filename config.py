@@ -392,6 +392,79 @@ Respond with ONLY valid JSON in this exact format (no markdown, no explanation):
 Always return exactly 6 entries in the answers array per team (use "" for blank ones).
 For low_confidence_fields, use: "code", "team_name", "tiebreaker", or "answers.0" through "answers.5"."""
 
+FEUD_QUESTIONS_PROMPT = """You are a Family Feud game writer. Generate 8 survey-style questions for a pub Family Feud night.
+
+Requirements:
+- Questions must start with "Name something...", "Name a...", "Name a place...", "Name a reason...", "Tell me something...", or similar Family Feud phrasing
+- Questions should be fun, debatable, and have many possible answers
+- Mix of topics: relationships, food, work, home, holidays, pop culture, everyday life, etc.
+- Avoid overly niche or obscure topics — everyone at a pub table should be able to contribute
+- Keep questions concise (under 15 words ideally)
+- Questions should work for adults at a pub (not a kids' show)
+
+{past_questions_block}
+
+Respond with ONLY valid JSON (no markdown, no explanation):
+{{"questions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5", "Question 6", "Question 7", "Question 8"]}}"""
+
+FEUD_ANSWERS_PROMPT = """You are a Family Feud game writer. Generate realistic survey answers for each of the following 8 Family Feud questions.
+
+{questions_block}
+
+Requirements:
+- Each round has a specific number of answers (shown in parentheses above). Generate EXACTLY that many answers per question.
+- Answers should be ranked from most popular (#1) to least popular
+- Point values should sum to approximately 97-100 per question
+- The #1 answer should typically have 25-55 points
+- The lowest answer should typically have 2-10 points
+- Answers should feel like real survey results — common answers that many people would give
+- Keep answers concise (1-4 words)
+- No duplicate answers within a question
+
+{past_questions_block}
+
+Respond with ONLY valid JSON in this exact format (no markdown, no explanation):
+{{
+  "rounds": [
+    {{
+      "question": "Name something you take on vacation",
+      "answers": [
+        {{"text": "Clothes", "points": 42}},
+        {{"text": "Sunscreen", "points": 28}},
+        {{"text": "Camera", "points": 18}},
+        {{"text": "Snacks", "points": 10}}
+      ]
+    }}
+  ]
+}}
+
+Generate exactly 8 rounds. Use the exact questions provided above. Each answer object must have "text" and "points" keys."""
+
+FEUD_REGEN_QUESTION_PROMPT = """You are a Family Feud game writer. Generate realistic survey answers for this Family Feud question:
+
+Question: "{question}"
+Number of answers needed: {num_answers}
+
+Requirements:
+- Generate EXACTLY {num_answers} answers
+- Answers ranked from most popular to least popular
+- Point values sum to approximately 97-100
+- The #1 answer should typically have 25-55 points
+- Keep answers concise (1-4 words)
+- Answers should feel like real survey results
+
+Do NOT use any of these answers (from other rounds):
+{existing_answers}
+
+Respond with ONLY valid JSON (no markdown, no explanation):
+{{
+  "question": "{question}",
+  "answers": [
+    {{"text": "Answer text", "points": 42}},
+    {{"text": "Another answer", "points": 28}}
+  ]
+}}"""
+
 PHOTO_SCAN_SINGLE_PROMPT = """You are extracting handwritten answers from a photo of a SINGLE team's Family Feud paper answer sheet.
 
 This photo shows ONE team's answer block with this layout:

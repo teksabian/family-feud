@@ -273,6 +273,7 @@ def init_db():
             ('extended_thinking_enabled', 'false', 'Enable extended thinking for AI calls'),
             ('thinking_budget_tokens', '10000', 'Token budget for extended thinking'),
             ('auto_ai_scoring', 'true', 'Auto AI score new submissions on the scoring queue'),
+            ('ai_generation_model', '', 'AI model for round generation'),
             ('color_theme', 'gamenight', 'UI color theme'),
         ]
 
