@@ -653,30 +653,67 @@
             font-size: 1.4em;
         }
 
-        .winner-interstitial .winner-next {
-            color: #888;
+        .winner-interstitial .winner-answers {
+            text-align: left;
+            margin: 15px auto;
+            max-width: 280px;
+        }
+
+        .winner-interstitial .winner-answers-question {
+            color: #ccc;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .winner-interstitial .winner-answers ol {
+            list-style: decimal;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .winner-interstitial .winner-answers li {
+            color: #fff;
             font-size: 0.9em;
+            padding: 3px 0;
         }
 
-        .winner-interstitial .winner-countdown-bar {
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
+        .winner-next-btn {
+            display: inline-block;
             margin-top: 15px;
-            overflow: hidden;
+            padding: 12px 30px;
+            background: var(--success, #28a745);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
-        .winner-interstitial .winner-countdown-fill {
-            height: 100%;
-            background: #ffd700;
-            border-radius: 2px;
-            animation: countdownShrink 5s linear forwards;
+        .winner-next-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
         }
 
-        @keyframes countdownShrink {
-            from { width: 100%; }
-            to { width: 0%; }
+        .winner-interstitial .winner-tiebreaker {
+            color: #ffd700;
+            font-size: 0.85em;
+            font-style: italic;
+            margin-top: 5px;
+        }
+
+        .winner-interstitial .winner-tiebreaker-answer {
+            color: #ccc;
+            font-size: 0.85em;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .winner-interstitial .winner-tiebreaker-answer span {
+            color: #ffd700;
+            font-weight: bold;
         }
     </style>
     
@@ -768,7 +805,7 @@
     <div class="container">
         <div class="card">
             <div class="waiting">
-                <h2>⏳ Waiting for Round</h2>
+                <h2>⏳ Waiting for the Round to Start</h2>
                 <div class="loading"></div>
                 <p>The host will start the next round soon.</p>
                 <div class="warning">
@@ -776,10 +813,70 @@
                 </div>
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page refreshes automatically...</p>
             </div>
+
+            {% if mobile_experience != 'basic' %}
+            <!-- Live Leaderboard -->
+            <div id="leaderboard-container" style="display: none; margin-top: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+                    <span style="font-size: 1.1em; font-weight: bold; color: var(--text-primary, #fff);">Leaderboard</span>
+                    <span id="live-badge" style="font-size: 0.7em; padding: 2px 8px; background: rgba(76,175,80,0.25); color: #4caf50; border: 1px solid rgba(76,175,80,0.4); border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Live</span>
+                </div>
+                <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+            {% endif %}
         </div>
     </div>
-    
+
     <script>
+        const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
+
+        function renderLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard-container');
+            const list = document.getElementById('leaderboard-list');
+            if (!container || !list || !leaderboard || leaderboard.length === 0) {
+                if (container) container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            // Track existing rows for animation
+            const existingRows = {};
+            list.querySelectorAll('[data-team]').forEach(row => {
+                existingRows[row.dataset.team] = row;
+            });
+
+            const fragment = document.createDocumentFragment();
+            leaderboard.forEach((entry, i) => {
+                const isYou = entry.team_name === myTeamName || entry.is_you;
+                const row = existingRows[entry.team_name] || document.createElement('div');
+                row.dataset.team = entry.team_name;
+                row.style.cssText = 'display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; transition: all 0.5s ease; ' +
+                    (isYou
+                        ? 'background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.3);'
+                        : 'background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);');
+                row.innerHTML =
+                    '<span style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 0.85em; flex-shrink: 0; ' +
+                    (i === 0 ? 'background: rgba(255,215,0,0.25); color: #ffd700; border: 1px solid rgba(255,215,0,0.4);' :
+                     i === 1 ? 'background: rgba(192,192,192,0.2); color: #c0c0c0; border: 1px solid rgba(192,192,192,0.3);' :
+                     i === 2 ? 'background: rgba(205,127,50,0.2); color: #cd7f32; border: 1px solid rgba(205,127,50,0.3);' :
+                     'background: rgba(255,255,255,0.1); color: #888; border: 1px solid rgba(255,255,255,0.1);') +
+                    '">' + entry.rank + '</span>' +
+                    '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
+                    (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
+                fragment.appendChild(row);
+            });
+            list.innerHTML = '';
+            list.appendChild(fragment);
+        }
+
+        // Fetch initial leaderboard
+        fetch('/api/leaderboard')
+            .then(r => r.json())
+            .then(data => { if (data.leaderboard) renderLeaderboard(data.leaderboard); })
+            .catch(() => {});
+
         function dismissBroadcast() {
             const text = document.getElementById('broadcast-text').textContent;
             if (text) {
@@ -809,41 +906,22 @@
             </div>
             
             <p style="color: var(--success); font-size: 1em; text-align: center; margin: 0;">✅ Submitted</p>
-            
-            {% if last_submission or submission %}
-            <!-- Answer Preview -->
-            <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 20px; margin: 15px 0;">
-                <h3 style="color: #999; margin-bottom: 15px; font-size: 1em; font-weight: normal;">Your Answers</h3>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    {% for i in range(1, num_answers + 1) %}
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="background: rgba(255,255,255,0.15); color: #aaa; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 0.85em;">{{ i }}</span>
-                        {% if last_submission %}
-                        <span style="color: #ccc; font-size: 1em;">{{ last_submission.answers['answer' ~ i] or '(blank)' }}</span>
-                        {% else %}
-                        <span style="color: #ccc; font-size: 1em;">{{ submission['answer' ~ i] or '(blank)' }}</span>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
+
+            {% if mobile_experience != 'basic' %}
+            <!-- Live Leaderboard -->
+            <div id="leaderboard-container" style="display: none; margin-top: 15px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+                    <span style="font-size: 1.1em; font-weight: bold; color: var(--text-primary, #fff);">Leaderboard</span>
+                    <span id="live-badge" style="font-size: 0.7em; padding: 2px 8px; background: rgba(76,175,80,0.25); color: #4caf50; border: 1px solid rgba(76,175,80,0.4); border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Live</span>
                 </div>
-                {% set tb = last_submission.tiebreaker if last_submission else submission['tiebreaker'] %}
-                {% if tb %}
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <span style="color: #999; font-weight: bold; font-size: 0.9em;">Tiebreaker:</span>
-                    <span style="color: #ccc; margin-left: 10px;">{{ tb }}</span>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-            
-            <!-- Submission Counter -->
-            <div id="submission-counter" style="text-align: center; margin: 15px 0; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;">
-                <span style="color: #aaa; font-size: 0.95em;">
-                    <span id="submitted-count" style="color: #fff; font-weight: bold;">{{ submission_count|default(0) }}</span>
-                    teams submitted
-                </span>
+                <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
             </div>
 
+            <div class="waiting" style="padding: 20px 0;">
+                <div class="loading"></div>
+                <p>Survey Says...</p>
+            </div>
+            {% else %}
             {% if submissions_closed %}
             <div style="padding: 20px; background: rgba(220,53,69,0.2); border: 2px solid #dc3545; border-radius: 10px; margin: 20px 0;">
                 <h3 style="color: #dc3545; margin-bottom: 10px;">⏰ Round Has Ended</h3>
@@ -860,6 +938,7 @@
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page will refresh automatically</p>
             </div>
             {% endif %}
+            {% endif %}
 
             <!-- Winner Interstitial (shown via JS on round transition) -->
             <div id="winner-interstitial" class="winner-interstitial">
@@ -868,14 +947,56 @@
                 <div class="winner-heading">WINNER</div>
                 <div class="winner-name" id="winner-name"></div>
                 <div class="winner-score"><span id="winner-score"></span> Points</div>
-                <div class="winner-next">Next round starting...</div>
-                <div class="winner-countdown-bar"><div class="winner-countdown-fill"></div></div>
+                <div class="winner-answers" id="winner-answers"></div>
+                <button class="winner-next-btn" onclick="window.location.href='/play'">Next Round →</button>
             </div>
         </div>
     </div>
-    
+
     <script>
         let winnerShown = false;
+        const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
+
+        function renderLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard-container');
+            const list = document.getElementById('leaderboard-list');
+            if (!container || !list || !leaderboard || leaderboard.length === 0) {
+                if (container) container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            const fragment = document.createDocumentFragment();
+            leaderboard.forEach((entry, i) => {
+                const isYou = entry.team_name === myTeamName || entry.is_you;
+                const row = document.createElement('div');
+                row.dataset.team = entry.team_name;
+                row.style.cssText = 'display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; transition: all 0.5s ease; ' +
+                    (isYou
+                        ? 'background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.3);'
+                        : 'background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);');
+                row.innerHTML =
+                    '<span style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 0.85em; flex-shrink: 0; ' +
+                    (i === 0 ? 'background: rgba(255,215,0,0.25); color: #ffd700; border: 1px solid rgba(255,215,0,0.4);' :
+                     i === 1 ? 'background: rgba(192,192,192,0.2); color: #c0c0c0; border: 1px solid rgba(192,192,192,0.3);' :
+                     i === 2 ? 'background: rgba(205,127,50,0.2); color: #cd7f32; border: 1px solid rgba(205,127,50,0.3);' :
+                     'background: rgba(255,255,255,0.1); color: #888; border: 1px solid rgba(255,255,255,0.1);') +
+                    '">' + entry.rank + '</span>' +
+                    '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
+                    (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
+                fragment.appendChild(row);
+            });
+            list.innerHTML = '';
+            list.appendChild(fragment);
+        }
+
+        // Fetch initial leaderboard
+        fetch('/api/leaderboard')
+            .then(r => r.json())
+            .then(data => { if (data.leaderboard) renderLeaderboard(data.leaderboard); })
+            .catch(() => {});
 
         function dismissBroadcast() {
             const text = document.getElementById('broadcast-text').textContent;
@@ -886,10 +1007,30 @@
             document.getElementById('broadcast-banner').style.display = 'none';
         }
 
-        function showWinnerInterstitial(teamName, score, roundNum) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
             document.getElementById('winner-score').textContent = score;
+
+            // Show tiebreaker badge if won on tiebreaker
+            var scoreEl = document.getElementById('winner-score').parentElement;
+            if (wonOnTiebreaker) {
+                var tbDiv = document.createElement('div');
+                tbDiv.className = 'winner-tiebreaker';
+                tbDiv.textContent = 'Won on Tiebreaker!';
+                scoreEl.insertAdjacentElement('afterend', tbDiv);
+            }
+
+            var answersEl = document.getElementById('winner-answers');
+            if (answersEl && question && answers && answers.length > 0) {
+                var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
+                answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
+                html += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    html += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
+                answersEl.innerHTML = html;
+            }
 
             const card = document.querySelector('.card');
             Array.from(card.children).forEach(child => {
@@ -928,6 +1069,17 @@
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page refreshes automatically...</p>
             </div>
 
+            {% if mobile_experience != 'basic' %}
+            <!-- Live Leaderboard -->
+            <div id="leaderboard-container" style="display: none; margin-top: 20px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+                    <span style="font-size: 1.1em; font-weight: bold; color: var(--text-primary, #fff);">Leaderboard</span>
+                    <span id="live-badge" style="font-size: 0.7em; padding: 2px 8px; background: rgba(76,175,80,0.25); color: #4caf50; border: 1px solid rgba(76,175,80,0.4); border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Live</span>
+                </div>
+                <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+            {% endif %}
+
             <!-- Winner Interstitial (shown via JS on round transition) -->
             <div id="winner-interstitial" class="winner-interstitial">
                 <div class="winner-trophy">🏆</div>
@@ -935,14 +1087,56 @@
                 <div class="winner-heading">WINNER</div>
                 <div class="winner-name" id="winner-name"></div>
                 <div class="winner-score"><span id="winner-score"></span> Points</div>
-                <div class="winner-next">Next round starting...</div>
-                <div class="winner-countdown-bar"><div class="winner-countdown-fill"></div></div>
+                <div class="winner-answers" id="winner-answers"></div>
+                <button class="winner-next-btn" onclick="window.location.href='/play'">Next Round →</button>
             </div>
         </div>
     </div>
-    
+
     <script>
         let winnerShown = false;
+        const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
+
+        function renderLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard-container');
+            const list = document.getElementById('leaderboard-list');
+            if (!container || !list || !leaderboard || leaderboard.length === 0) {
+                if (container) container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            const fragment = document.createDocumentFragment();
+            leaderboard.forEach((entry, i) => {
+                const isYou = entry.team_name === myTeamName || entry.is_you;
+                const row = document.createElement('div');
+                row.dataset.team = entry.team_name;
+                row.style.cssText = 'display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; transition: all 0.5s ease; ' +
+                    (isYou
+                        ? 'background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.3);'
+                        : 'background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);');
+                row.innerHTML =
+                    '<span style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 0.85em; flex-shrink: 0; ' +
+                    (i === 0 ? 'background: rgba(255,215,0,0.25); color: #ffd700; border: 1px solid rgba(255,215,0,0.4);' :
+                     i === 1 ? 'background: rgba(192,192,192,0.2); color: #c0c0c0; border: 1px solid rgba(192,192,192,0.3);' :
+                     i === 2 ? 'background: rgba(205,127,50,0.2); color: #cd7f32; border: 1px solid rgba(205,127,50,0.3);' :
+                     'background: rgba(255,255,255,0.1); color: #888; border: 1px solid rgba(255,255,255,0.1);') +
+                    '">' + entry.rank + '</span>' +
+                    '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
+                    (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
+                fragment.appendChild(row);
+            });
+            list.innerHTML = '';
+            list.appendChild(fragment);
+        }
+
+        // Fetch initial leaderboard
+        fetch('/api/leaderboard')
+            .then(r => r.json())
+            .then(data => { if (data.leaderboard) renderLeaderboard(data.leaderboard); })
+            .catch(() => {});
 
         function dismissBroadcast() {
             const text = document.getElementById('broadcast-text').textContent;
@@ -953,10 +1147,30 @@
             document.getElementById('broadcast-banner').style.display = 'none';
         }
 
-        function showWinnerInterstitial(teamName, score, roundNum) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
             document.getElementById('winner-score').textContent = score;
+
+            // Show tiebreaker badge if won on tiebreaker
+            var scoreEl = document.getElementById('winner-score').parentElement;
+            if (wonOnTiebreaker) {
+                var tbDiv = document.createElement('div');
+                tbDiv.className = 'winner-tiebreaker';
+                tbDiv.textContent = 'Won on Tiebreaker!';
+                scoreEl.insertAdjacentElement('afterend', tbDiv);
+            }
+
+            var answersEl = document.getElementById('winner-answers');
+            if (answersEl && question && answers && answers.length > 0) {
+                var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
+                answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
+                html += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    html += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
+                answersEl.innerHTML = html;
+            }
 
             const card = document.querySelector('.card');
             Array.from(card.children).forEach(child => {
@@ -1170,6 +1384,43 @@
             return false;
         }
 
+        const myTeamName = {{ team_name|tojson }};
+        const mobileExperience = {{ (mobile_experience or 'advanced_no_pp')|tojson }};
+
+        function renderLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard-container');
+            const list = document.getElementById('leaderboard-list');
+            if (!container || !list || !leaderboard || leaderboard.length === 0) {
+                if (container) container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            const fragment = document.createDocumentFragment();
+            leaderboard.forEach((entry, i) => {
+                const isYou = entry.team_name === myTeamName || entry.is_you;
+                const row = document.createElement('div');
+                row.dataset.team = entry.team_name;
+                row.style.cssText = 'display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; transition: all 0.5s ease; ' +
+                    (isYou
+                        ? 'background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.3);'
+                        : 'background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);');
+                row.innerHTML =
+                    '<span style="min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 0.85em; flex-shrink: 0; ' +
+                    (i === 0 ? 'background: rgba(255,215,0,0.25); color: #ffd700; border: 1px solid rgba(255,215,0,0.4);' :
+                     i === 1 ? 'background: rgba(192,192,192,0.2); color: #c0c0c0; border: 1px solid rgba(192,192,192,0.3);' :
+                     i === 2 ? 'background: rgba(205,127,50,0.2); color: #cd7f32; border: 1px solid rgba(205,127,50,0.3);' :
+                     'background: rgba(255,255,255,0.1); color: #888; border: 1px solid rgba(255,255,255,0.1);') +
+                    '">' + entry.rank + '</span>' +
+                    '<span style="flex: 1; margin-left: 10px; color: ' + (isYou ? '#4caf50' : '#ccc') + '; font-size: 0.95em; font-weight: ' + (isYou ? 'bold' : 'normal') + '; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' +
+                    (isYou ? entry.team_name + ' (You)' : entry.team_name) + '</span>' +
+                    '<span style="font-weight: bold; color: ' + (isYou ? '#4caf50' : '#fff') + '; font-size: 1em; margin-left: 8px;">' + (entry.pending ? '\u231B' : entry.total_score) + '</span>';
+                fragment.appendChild(row);
+            });
+            list.innerHTML = '';
+            list.appendChild(fragment);
+        }
+
         function showSubmittedView(data) {
             // Replace the card content with the submitted confirmation
             var card = document.querySelector('.card');
@@ -1187,76 +1438,60 @@
             successDiv.appendChild(checkP);
             wrapper.appendChild(successDiv);
 
-            // Answers preview
-            var previewDiv = document.createElement('div');
-            previewDiv.style.cssText = 'background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:20px; margin:15px 0;';
-            var heading = document.createElement('h3');
-            heading.style.cssText = 'color:#999; margin-bottom:15px; font-size:1em; font-weight:normal;';
-            heading.textContent = 'Your Answers';
-            previewDiv.appendChild(heading);
+            if (mobileExperience !== 'basic') {
+                // Leaderboard container (populated by WebSocket + fetch)
+                var lbContainer = document.createElement('div');
+                lbContainer.id = 'leaderboard-container';
+                lbContainer.style.cssText = 'display:none; margin-top:15px;';
+                var lbHeader = document.createElement('div');
+                lbHeader.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px;';
+                lbHeader.innerHTML = '<span style="font-size:1.1em; font-weight:bold; color:var(--text-primary, #fff);">Leaderboard</span>' +
+                    '<span style="font-size:0.7em; padding:2px 8px; background:rgba(76,175,80,0.25); color:#4caf50; border:1px solid rgba(76,175,80,0.4); border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">Live</span>';
+                lbContainer.appendChild(lbHeader);
+                var lbList = document.createElement('div');
+                lbList.id = 'leaderboard-list';
+                lbList.style.cssText = 'display:flex; flex-direction:column; gap:4px;';
+                lbContainer.appendChild(lbList);
+                wrapper.appendChild(lbContainer);
 
-            var listDiv = document.createElement('div');
-            listDiv.style.cssText = 'display:flex; flex-direction:column; gap:10px;';
-            for (var i = 1; i <= data.num_answers; i++) {
-                var row = document.createElement('div');
-                row.style.cssText = 'display:flex; align-items:center; gap:10px;';
-                var num = document.createElement('span');
-                num.style.cssText = 'background:rgba(255,255,255,0.15); color:#aaa; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; font-size:0.85em;';
-                num.textContent = i;
-                var ans = document.createElement('span');
-                ans.style.cssText = 'color:#ccc; font-size:1em;';
-                ans.textContent = data.answers['answer' + i] || '(blank)';
-                row.appendChild(num);
-                row.appendChild(ans);
-                listDiv.appendChild(row);
+                // Fetch leaderboard immediately
+                fetch('/api/leaderboard')
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { if (d.leaderboard && typeof renderLeaderboard === 'function') renderLeaderboard(d.leaderboard); })
+                    .catch(function() {});
+
+                // Survey Says waiting message
+                var waitDiv = document.createElement('div');
+                waitDiv.className = 'waiting';
+                waitDiv.style.cssText = 'padding:20px 0;';
+                var loader = document.createElement('div');
+                loader.className = 'loading';
+                var waitP = document.createElement('p');
+                waitP.textContent = 'Survey Says...';
+                waitDiv.appendChild(loader);
+                waitDiv.appendChild(waitP);
+                wrapper.appendChild(waitDiv);
+            } else {
+                // Basic mode: classic waiting message
+                var warnDiv = document.createElement('div');
+                warnDiv.className = 'warning';
+                warnDiv.textContent = '\u26A0\uFE0F Do not manually refresh the page';
+                wrapper.appendChild(warnDiv);
+                var waitDiv = document.createElement('div');
+                waitDiv.className = 'waiting';
+                waitDiv.style.cssText = 'padding:20px 0;';
+                var loader = document.createElement('div');
+                loader.className = 'loading';
+                var waitP = document.createElement('p');
+                waitP.textContent = 'Waiting for next round...';
+                var waitP2 = document.createElement('p');
+                waitP2.style.cssText = 'font-size:0.85em; opacity:0.8; margin-top:10px;';
+                waitP2.textContent = 'This page will refresh automatically';
+                waitDiv.appendChild(loader);
+                waitDiv.appendChild(waitP);
+                waitDiv.appendChild(waitP2);
+                wrapper.appendChild(waitDiv);
             }
-            previewDiv.appendChild(listDiv);
-
-            if (data.tiebreaker !== undefined) {
-                var tbDiv = document.createElement('div');
-                tbDiv.style.cssText = 'margin-top:15px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1);';
-                var tbLabel = document.createElement('span');
-                tbLabel.style.cssText = 'color:#999; font-weight:bold; font-size:0.9em;';
-                tbLabel.textContent = 'Tiebreaker:';
-                var tbVal = document.createElement('span');
-                tbVal.style.cssText = 'color:#ccc; margin-left:10px;';
-                tbVal.textContent = data.tiebreaker;
-                tbDiv.appendChild(tbLabel);
-                tbDiv.appendChild(tbVal);
-                previewDiv.appendChild(tbDiv);
-            }
-            wrapper.appendChild(previewDiv);
-
-            // Submission counter
-            var counterDiv = document.createElement('div');
-            counterDiv.id = 'submission-counter';
-            counterDiv.style.cssText = 'text-align:center; margin:15px 0; padding:12px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px;';
-            var counterSpan = document.createElement('span');
-            counterSpan.style.cssText = 'color:#aaa; font-size:0.95em;';
-            var submittedNum = document.createElement('span');
-            submittedNum.id = 'submitted-count';
-            submittedNum.style.cssText = 'color:#fff; font-weight:bold;';
-            submittedNum.textContent = data.submission_count || '?';
-            counterSpan.appendChild(submittedNum);
-            counterSpan.appendChild(document.createTextNode(' teams submitted'));
-            counterDiv.appendChild(counterSpan);
-            wrapper.appendChild(counterDiv);
-
-            // Waiting message
-            var waitDiv = document.createElement('div');
-            waitDiv.className = 'waiting';
-            waitDiv.style.cssText = 'padding:20px 0;';
-            var loader = document.createElement('div');
-            loader.className = 'loading';
-            var waitP = document.createElement('p');
-            waitP.textContent = 'Waiting for next round...';
-            var waitP2 = document.createElement('p');
-            waitP2.style.cssText = 'font-size:0.85em; opacity:0.8; margin-top:10px;';
-            waitP2.textContent = 'This page will refresh automatically';
-            waitDiv.appendChild(loader);
-            waitDiv.appendChild(waitP);
-            waitDiv.appendChild(waitP2);
-            wrapper.appendChild(waitDiv);
 
             // Hide progress indicator
             var progress = document.getElementById('answerProgress');
@@ -1271,9 +1506,25 @@
 
         var winnerShown = false;
 
-        function showWinnerInterstitial(teamName, score, roundNum) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             var card = document.querySelector('.card');
             if (!card) return;
+
+            var tiebreakerHtml = wonOnTiebreaker ? '<div class="winner-tiebreaker">Won on Tiebreaker!</div>' : '';
+
+            var answersHtml = '';
+            if (question && answers && answers.length > 0) {
+                var escapedQ = question.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                answersHtml = '<div class="winner-answers"><div class="winner-answers-question">' + escapedQ + '</div><ol>';
+                answers.forEach(function(a) {
+                    answersHtml += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>';
+                });
+                answersHtml += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    answersHtml += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
+                answersHtml += '</div>';
+            }
 
             card.innerHTML = '';
             var interstitial = document.createElement('div');
@@ -1285,8 +1536,9 @@
                 '<div class="winner-heading">WINNER</div>' +
                 '<div class="winner-name">' + teamName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
                 '<div class="winner-score"><span>' + score + '</span> Points</div>' +
-                '<div class="winner-next">Next round starting...</div>' +
-                '<div class="winner-countdown-bar"><div class="winner-countdown-fill"></div></div>';
+                tiebreakerHtml +
+                answersHtml +
+                '<button class="winner-next-btn" onclick="window.location.href=\'/play\'">Next Round &rarr;</button>';
             card.appendChild(interstitial);
             winnerShown = true;
         }
@@ -1450,6 +1702,13 @@
                     var dot = document.getElementById('connectionDot');
                     if (dot) { dot.classList.remove('disconnected'); dot.title = 'Connected'; }
                 }
+                // Refresh leaderboard on reconnect
+                if (typeof renderLeaderboard === 'function') {
+                    fetch('/api/leaderboard')
+                        .then(r => r.json())
+                        .then(lb => { if (lb.leaderboard) renderLeaderboard(lb.leaderboard); })
+                        .catch(() => {});
+                }
             } catch (e) {
                 console.warn('[WS] Reconnect sync failed:', e);
             }
@@ -1464,8 +1723,7 @@
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
             if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
-                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '');
-                setTimeout(function() { window.location.href = '/play'; }, 5000);
+                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
             } else {
                 window.location.href = '/play';
             }
@@ -1496,10 +1754,11 @@
             window.location.reload();
         });
 
-        socket.on('submission:count', (data) => {
-            console.log('[WS] submission:count', data);
-            var submitted = document.getElementById('submitted-count');
-            if (submitted) submitted.textContent = data.submitted;
+        socket.on('leaderboard:update', (data) => {
+            console.log('[WS] leaderboard:update', data);
+            if (typeof renderLeaderboard === 'function' && data.leaderboard) {
+                renderLeaderboard(data.leaderboard);
+            }
         });
 
         socket.on('broadcast:message', (data) => {

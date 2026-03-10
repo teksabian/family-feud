@@ -419,6 +419,23 @@ def start_next_round():
                     round_started_data['previous_winner_score'] = prev_winner['score']
                     round_started_data['previous_round_number'] = prev_winner['round_number']
 
+                    # Include previous round's survey question + answers for the winner screen
+                    round_started_data['previous_question'] = active_round['question']
+                    prev_answers = []
+                    for i in range(1, 7):
+                        ans = active_round[f'answer{i}']
+                        if ans:
+                            prev_answers.append(ans)
+                    round_started_data['previous_answers'] = prev_answers
+
+                    # Detect if win was by tiebreaker (multiple teams tied on score)
+                    tied_count = conn.execute(
+                        "SELECT COUNT(*) FROM submissions WHERE round_id = ? AND host_submitted = 1 AND score = ?",
+                        (active_round['id'], prev_winner['score'])
+                    ).fetchone()[0]
+                    round_started_data['previous_won_on_tiebreaker'] = tied_count > 1
+                    round_started_data['previous_tiebreaker_answer'] = active_round['answer1_count']
+
                 socketio.emit('round:started', round_started_data, to='teams')
                 socketio.emit('round:started', round_started_data, to='hosts')
                 logger.info(f"[ROUND] Activated round {current_num + 1} (id={next_round['id']})")

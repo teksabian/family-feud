@@ -484,7 +484,27 @@
                 {% endif %}
             </div>
         </div>
-        
+
+        <!-- Mobile Experience -->
+        <div class="card">
+            <h2>📱 Mobile Experience</h2>
+            <form method="POST" action="{{ url_for('host.set_mobile_experience') }}?v={{ cache_bust }}">
+                <div class="form-group">
+                    <label for="mobile_experience">Team Screen Mode</label>
+                    <select name="mode" id="mobile_experience" onchange="this.closest('form').submit()" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 1em; cursor: pointer;">
+                        <option value="basic" {% if mobile_experience == 'basic' %}selected{% endif %}>Basic</option>
+                        <option value="advanced_no_pp" {% if mobile_experience == 'advanced_no_pp' %}selected{% endif %}>Advanced (No PP Display)</option>
+                        <option value="advanced_pp" disabled>Advanced (PP Display) — Coming Soon</option>
+                    </select>
+                </div>
+            </form>
+            <div class="help-text">
+                <strong>Basic:</strong> Classic waiting screen after submission<br>
+                <strong>Advanced (No PP Display):</strong> Live leaderboard on team screens — best for games without a PowerPoint reveal<br>
+                <strong>Advanced (PP Display):</strong> Live leaderboard with hidden scores until reveal — for PowerPoint games (coming soon)
+            </div>
+        </div>
+
         <!-- Color Theme -->
         <div class="card">
             <h2>🎨 Color Theme</h2>

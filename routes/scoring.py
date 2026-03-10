@@ -25,6 +25,43 @@ from ai import save_correction_to_history, extract_single_scorecard, extract_ans
 scoring_bp = Blueprint('scoring', __name__)
 
 
+def emit_leaderboard_update():
+    """Emit cumulative leaderboard to all team screens. No answer data exposed."""
+    try:
+        with db_connect() as conn:
+            active_round = conn.execute("SELECT id FROM rounds WHERE is_active = 1").fetchone()
+            active_round_id = active_round['id'] if active_round else -1
+
+            teams = conn.execute("""
+                SELECT tc.team_name, tc.code,
+                       COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score,
+                       MAX(CASE WHEN s.round_id = ? AND s.host_submitted = 1 THEN 1 ELSE 0 END) as current_round_scored,
+                       MAX(CASE WHEN s.host_submitted = 1 THEN 1 ELSE 0 END) as has_been_scored
+                FROM team_codes tc
+                LEFT JOIN submissions s ON tc.code = s.code
+                WHERE tc.used = 1 AND tc.team_name IS NOT NULL
+                GROUP BY tc.code
+                ORDER BY total_score DESC, tc.team_name ASC
+            """, (active_round_id,)).fetchall()
+
+            leaderboard = []
+            for i, row in enumerate(teams):
+                leaderboard.append({
+                    'team_name': row['team_name'],
+                    'code': row['code'],
+                    'total_score': row['total_score'],
+                    'rank': i + 1,
+                    'pending': bool(
+                        (active_round and not row['current_round_scored']) or
+                        (not active_round and not row['has_been_scored'])
+                    )
+                })
+
+            socketio.emit('leaderboard:update', {'leaderboard': leaderboard}, to='teams')
+    except Exception as e:
+        logger.error(f"[LEADERBOARD] Error emitting update: {e}")
+
+
 def run_ai_scoring_for_submission(submission_id, auto_accept=False):
     """Shared helper: run AI scoring for a submission and persist results to DB.
 
@@ -117,6 +154,7 @@ def run_ai_scoring_for_submission(submission_id, auto_accept=False):
                     'code': submission['code'],
                     'score': score
                 }, to='hosts')
+                emit_leaderboard_update()
 
             conn.commit()
 
@@ -361,6 +399,7 @@ def score_team(submission_id):
             'code': submission['code'],
             'score': score
         }, to='hosts')
+        emit_leaderboard_update()
 
         # Check if all submissions for this round are scored
         total_subs = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",
@@ -468,6 +507,7 @@ def undo_score(submission_id):
         conn.commit()
 
         logger.info(f"[SCORING] undo_score() - {team_name} reverted from {submission['score']} to {previous_score}")
+        emit_leaderboard_update()
 
         return jsonify({
             "success": True,
@@ -638,6 +678,7 @@ def update_score(submission_id):
                         (score, checked_answers_str, previous_score, submission_id))
         conn.commit()
     logger.info(f"[SCORING] update_score() - old_score={previous_score}, new_score={score}, checked={checked_answers_str}, tiebreaker={tiebreaker}")
+    emit_leaderboard_update()
     return redirect(url_for('scoring.scored_teams'))
 
 @scoring_bp.route('/host/edit-submission/<int:submission_id>')
@@ -739,6 +780,7 @@ def revert_score(submission_id):
             conn.execute("UPDATE submissions SET score = ?, previous_score = score WHERE id = ?",
                         (current_previous, submission_id))
             conn.commit()
+            emit_leaderboard_update()
 
     return redirect(url_for('scoring.scored_teams'))
 
