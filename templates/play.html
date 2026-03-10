@@ -696,6 +696,25 @@
             background: #218838;
             transform: translateY(-2px);
         }
+
+        .winner-interstitial .winner-tiebreaker {
+            color: #ffd700;
+            font-size: 0.85em;
+            font-style: italic;
+            margin-top: 5px;
+        }
+
+        .winner-interstitial .winner-tiebreaker-answer {
+            color: #ccc;
+            font-size: 0.85em;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .winner-interstitial .winner-tiebreaker-answer span {
+            color: #ffd700;
+            font-weight: bold;
+        }
     </style>
     
     <script>
@@ -988,16 +1007,28 @@
             document.getElementById('broadcast-banner').style.display = 'none';
         }
 
-        function showWinnerInterstitial(teamName, score, roundNum, question, answers) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
             document.getElementById('winner-score').textContent = score;
+
+            // Show tiebreaker badge if won on tiebreaker
+            var scoreEl = document.getElementById('winner-score').parentElement;
+            if (wonOnTiebreaker) {
+                var tbDiv = document.createElement('div');
+                tbDiv.className = 'winner-tiebreaker';
+                tbDiv.textContent = 'Won on Tiebreaker!';
+                scoreEl.insertAdjacentElement('afterend', tbDiv);
+            }
 
             var answersEl = document.getElementById('winner-answers');
             if (answersEl && question && answers && answers.length > 0) {
                 var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
                 answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
                 html += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    html += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
                 answersEl.innerHTML = html;
             }
 
@@ -1116,16 +1147,28 @@
             document.getElementById('broadcast-banner').style.display = 'none';
         }
 
-        function showWinnerInterstitial(teamName, score, roundNum, question, answers) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
             document.getElementById('winner-score').textContent = score;
+
+            // Show tiebreaker badge if won on tiebreaker
+            var scoreEl = document.getElementById('winner-score').parentElement;
+            if (wonOnTiebreaker) {
+                var tbDiv = document.createElement('div');
+                tbDiv.className = 'winner-tiebreaker';
+                tbDiv.textContent = 'Won on Tiebreaker!';
+                scoreEl.insertAdjacentElement('afterend', tbDiv);
+            }
 
             var answersEl = document.getElementById('winner-answers');
             if (answersEl && question && answers && answers.length > 0) {
                 var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
                 answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
                 html += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    html += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
                 answersEl.innerHTML = html;
             }
 
@@ -1463,9 +1506,11 @@
 
         var winnerShown = false;
 
-        function showWinnerInterstitial(teamName, score, roundNum, question, answers) {
+        function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             var card = document.querySelector('.card');
             if (!card) return;
+
+            var tiebreakerHtml = wonOnTiebreaker ? '<div class="winner-tiebreaker">Won on Tiebreaker!</div>' : '';
 
             var answersHtml = '';
             if (question && answers && answers.length > 0) {
@@ -1474,7 +1519,11 @@
                 answers.forEach(function(a) {
                     answersHtml += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>';
                 });
-                answersHtml += '</ol></div>';
+                answersHtml += '</ol>';
+                if (tiebreakerAnswer != null) {
+                    answersHtml += '<div class="winner-tiebreaker-answer">Tiebreaker: <span>' + tiebreakerAnswer + '</span></div>';
+                }
+                answersHtml += '</div>';
             }
 
             card.innerHTML = '';
@@ -1487,6 +1536,7 @@
                 '<div class="winner-heading">WINNER</div>' +
                 '<div class="winner-name">' + teamName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
                 '<div class="winner-score"><span>' + score + '</span> Points</div>' +
+                tiebreakerHtml +
                 answersHtml +
                 '<button class="winner-next-btn" onclick="window.location.href=\'/play\'">Next Round &rarr;</button>';
             card.appendChild(interstitial);
@@ -1673,7 +1723,7 @@
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
             if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
-                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers);
+                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
             } else {
                 window.location.href = '/play';
             }
