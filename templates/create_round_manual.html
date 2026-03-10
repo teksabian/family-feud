@@ -529,20 +529,18 @@
                                placeholder="Answer #{{ i }}..." 
                                required>
                         
-                        {% if i == 1 %}
                         <div class="count-input">
-                            <label for="round{{ config.round }}_answer1_count">
-                                Count (out of 100):
+                            <label for="round{{ config.round }}_answer{{ i }}_count">
+                                Points:
                             </label>
-                            <input type="number" 
-                                   name="round{{ config.round }}_answer1_count" 
-                                   id="round{{ config.round }}_answer1_count"
+                            <input type="number"
+                                   name="round{{ config.round }}_answer{{ i }}_count"
+                                   id="round{{ config.round }}_answer{{ i }}_count"
                                    placeholder="0-100"
                                    min="0"
                                    max="100"
                                    required>
                         </div>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -593,10 +591,12 @@
                     }
                 }
 
-                // Fill answer1 count
-                var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
-                if (countField) {
-                    countField.value = roundData.answer1_count;
+                // Fill answer counts (prebuilt surveys only have answer1_count)
+                for (var i = 1; i <= numAnswers; i++) {
+                    var countField = document.querySelector('[name="round' + roundNum + '_answer' + i + '_count"]');
+                    if (countField) {
+                        countField.value = (i === 1) ? (roundData.answer1_count || 0) : 0;
+                    }
                 }
             });
         }
@@ -631,10 +631,9 @@
                 for (var i = 1; i <= numAnswers; i++) {
                     var answerField = document.querySelector('[name="round' + roundNum + '_answer' + i + '"]');
                     if (answerField) answerField.value = '';
+                    var countField = document.querySelector('[name="round' + roundNum + '_answer' + i + '_count"]');
+                    if (countField) countField.value = '';
                 }
-
-                var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
-                if (countField) countField.value = '';
             });
             // Remove any regen buttons
             document.querySelectorAll('.regen-btn').forEach(function(btn) { btn.remove(); });
@@ -747,19 +746,17 @@
                 var qField = document.querySelector('[name="question' + roundNum + '"]');
                 if (qField) qField.value = rd.question;
 
-                // Set answers and points
+                // Set answers and points for all answers
                 var answers = rd.answers || [];
                 for (var i = 1; i <= numAnswers; i++) {
                     var aField = document.querySelector('[name="round' + roundNum + '_answer' + i + '"]');
                     if (aField && answers[i - 1]) {
                         aField.value = answers[i - 1].text;
                     }
-                }
-
-                // Set answer1_count to the #1 answer's points
-                var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
-                if (countField && answers[0]) {
-                    countField.value = answers[0].points;
+                    var countField = document.querySelector('[name="round' + roundNum + '_answer' + i + '_count"]');
+                    if (countField && answers[i - 1]) {
+                        countField.value = answers[i - 1].points;
+                    }
                 }
             });
         }
@@ -831,9 +828,9 @@
                     for (var i = 1; i <= numAnswers; i++) {
                         var f = document.querySelector('[name="round' + roundNum + '_answer' + i + '"]');
                         if (f && answers[i - 1]) f.value = answers[i - 1].text;
+                        var cf = document.querySelector('[name="round' + roundNum + '_answer' + i + '_count"]');
+                        if (cf && answers[i - 1]) cf.value = answers[i - 1].points;
                     }
-                    var countField = document.querySelector('[name="round' + roundNum + '_answer1_count"]');
-                    if (countField && answers[0]) countField.value = answers[0].points;
                     setAiStatus('Round ' + roundNum + ' answers regenerated!');
                 } else {
                     setAiStatus('Error regenerating round ' + roundNum + ': ' + (data.error || 'Unknown'), true);

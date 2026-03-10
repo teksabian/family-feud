@@ -350,12 +350,9 @@ def set_answers(round_id):
         for i in range(1, 7):
             if i <= num_answers:
                 fields.append(f'answer{i} = ?')
-                if i == 1:
-                    fields.append(f'answer{i}_count = ?')
-                    values.append(request.form.get(f'answer{i}', '').strip())
-                    values.append(int(request.form.get(f'answer{i}_count', 0) or 0))
-                else:
-                    values.append(request.form.get(f'answer{i}', '').strip())
+                fields.append(f'answer{i}_count = ?')
+                values.append(request.form.get(f'answer{i}', '').strip())
+                values.append(int(request.form.get(f'answer{i}_count', 0) or 0))
 
         answer1 = request.form.get('answer1', '').strip()
         if not answer1:
@@ -470,7 +467,7 @@ def edit_single_answer(round_id, answer_num):
             flash('Round not found!', 'error'); return redirect(url_for('.host_dashboard'))
 
         current_answer = round_info[f'answer{answer_num}']
-        current_count = round_info['answer1_count'] if answer_num == 1 else None
+        current_count = round_info[f'answer{answer_num}_count']
 
     return render_template('edit_answer.html',
                          round=dict(round_info),
@@ -490,19 +487,12 @@ def update_single_answer(round_id, answer_num):
         return redirect(url_for('.host_dashboard'))
 
     with db_connect() as conn:
-        if answer_num == 1:
-            new_count = int(request.form.get('count', 0) or 0)
-            conn.execute("""
-                UPDATE rounds
-                SET answer1 = ?, answer1_count = ?
-                WHERE id = ?
-            """, (new_answer, new_count, round_id))
-        else:
-            conn.execute(f"""
-                UPDATE rounds
-                SET answer{answer_num} = ?
-                WHERE id = ?
-            """, (new_answer, round_id))
+        new_count = int(request.form.get('count', 0) or 0)
+        conn.execute(f"""
+            UPDATE rounds
+            SET answer{answer_num} = ?, answer{answer_num}_count = ?
+            WHERE id = ?
+        """, (new_answer, new_count, round_id))
 
         conn.commit()
 
@@ -547,17 +537,15 @@ def create_round_manual_submit():
                 is_active = 0
                 values = [round_num, question, num_answers, is_active]
 
-                # Get answers for this round
+                # Get answers and counts for this round
                 for i in range(1, num_answers + 1):
                     answer = request.form.get(f'round{round_num}_answer{i}', '').strip()
                     fields.append(f'answer{i}')
                     values.append(answer)
 
-                    # Get count only for answer #1
-                    if i == 1:
-                        count = int(request.form.get(f'round{round_num}_answer1_count', 0) or 0)
-                        fields.append(f'answer{i}_count')
-                        values.append(count)
+                    count = int(request.form.get(f'round{round_num}_answer{i}_count', 0) or 0)
+                    fields.append(f'answer{i}_count')
+                    values.append(count)
 
                 answer1 = request.form.get(f'round{round_num}_answer1', '').strip()
                 if not answer1:

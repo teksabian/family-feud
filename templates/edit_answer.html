@@ -158,18 +158,16 @@
                            autofocus>
                 </div>
                 
-                {% if answer_num == 1 %}
                 <div class="form-group">
-                    <label for="count">Count (out of 100):</label>
-                    <input type="number" 
-                           name="count" 
+                    <label for="count">Points (out of 100):</label>
+                    <input type="number"
+                           name="count"
                            id="count"
-                           value="{{ current_count }}" 
-                           min="0" 
-                           max="100" 
+                           value="{{ current_count or 0 }}"
+                           min="0"
+                           max="100"
                            required>
                 </div>
-                {% endif %}
                 
                 <div class="button-group">
                     <button type="submit" class="btn-save">💾 Save</button>
