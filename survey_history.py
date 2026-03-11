@@ -5,12 +5,14 @@ Saves completed AI-generated surveys to survey_history.json so they
 can be reused or referenced later. Survives server restarts.
 """
 
+import base64
 import json
 import os
-import subprocess
+import urllib.error
+import urllib.request
 from datetime import datetime
 
-from config import logger, SURVEY_HISTORY_FILE
+from config import logger, SURVEY_HISTORY_FILE, GITHUB_TOKEN, GITHUB_REPO
 
 MAX_SURVEYS = 80  # ~10 weeks of games (8 rounds each)
 
@@ -70,32 +72,63 @@ def save_survey_history(rounds_rows):
 
         logger.info(f"[SURVEY-HISTORY] Saved survey with {len(survey['rounds'])} rounds (total in history: {len(history)})")
 
-        # Commit to repo so history survives ephemeral filesystem restarts
-        _commit_history()
+        # Push to GitHub so history survives ephemeral filesystem restarts
+        _push_to_github(history)
     except Exception as e:
         logger.warning(f"[SURVEY-HISTORY] Failed to save survey: {e}")
 
 
-def _commit_history():
-    """Commit and push survey_history.json so it persists across deploys."""
+def _push_to_github(history):
+    """Push survey_history.json to GitHub via the Contents API."""
+    if not GITHUB_TOKEN:
+        logger.info("[SURVEY-HISTORY] GITHUB_TOKEN not set, skipping GitHub push")
+        return
+
     try:
-        subprocess.run(
-            ["git", "add", SURVEY_HISTORY_FILE],
-            check=True, capture_output=True, timeout=10,
+        file_path = 'survey_history.json'
+        api_url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}'
+
+        # Get current file SHA (needed for updates)
+        get_req = urllib.request.Request(api_url, headers={
+            'Authorization': f'token {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json',
+        })
+
+        existing_sha = None
+        try:
+            with urllib.request.urlopen(get_req) as resp:
+                file_info = json.loads(resp.read().decode())
+                existing_sha = file_info.get('sha')
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+
+        # PUT updated content
+        content_b64 = base64.b64encode(json.dumps(history, indent=2).encode('utf-8')).decode('utf-8')
+        payload = {
+            'message': f'Update survey history ({len(history)} surveys)',
+            'content': content_b64,
+        }
+        if existing_sha:
+            payload['sha'] = existing_sha
+
+        put_req = urllib.request.Request(
+            api_url,
+            data=json.dumps(payload).encode('utf-8'),
+            method='PUT',
+            headers={
+                'Authorization': f'token {GITHUB_TOKEN}',
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+            },
         )
-        subprocess.run(
-            ["git", "commit", "-m", "Update survey history"],
-            check=True, capture_output=True, timeout=10,
-        )
-        subprocess.run(
-            ["git", "push"],
-            check=True, capture_output=True, timeout=30,
-        )
-        logger.info("[SURVEY-HISTORY] Committed and pushed survey history to repo")
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"[SURVEY-HISTORY] Git commit/push failed: {e.stderr}")
+
+        with urllib.request.urlopen(put_req) as resp:
+            if resp.status in (200, 201):
+                logger.info(f"[SURVEY-HISTORY] Pushed survey history to GitHub ({len(history)} surveys)")
+
     except Exception as e:
-        logger.warning(f"[SURVEY-HISTORY] Git commit/push failed: {e}")
+        logger.warning(f"[SURVEY-HISTORY] GitHub push failed: {e}")
 
 
 def build_past_questions_block():
