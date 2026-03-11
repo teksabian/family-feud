@@ -7,9 +7,12 @@ can be reused or referenced later. Survives server restarts.
 
 import json
 import os
+import subprocess
 from datetime import datetime
 
 from config import logger, SURVEY_HISTORY_FILE
+
+MAX_SURVEYS = 80  # ~10 weeks of games (8 rounds each)
 
 
 def load_survey_history():
@@ -58,12 +61,41 @@ def save_survey_history(rounds_rows):
 
         history.append(survey)
 
+        # Trim to last MAX_SURVEYS to avoid unbounded growth
+        if len(history) > MAX_SURVEYS:
+            history = history[-MAX_SURVEYS:]
+
         with open(SURVEY_HISTORY_FILE, 'w') as f:
             json.dump(history, f, indent=2)
 
         logger.info(f"[SURVEY-HISTORY] Saved survey with {len(survey['rounds'])} rounds (total in history: {len(history)})")
+
+        # Commit to repo so history survives ephemeral filesystem restarts
+        _commit_history()
     except Exception as e:
         logger.warning(f"[SURVEY-HISTORY] Failed to save survey: {e}")
+
+
+def _commit_history():
+    """Commit and push survey_history.json so it persists across deploys."""
+    try:
+        subprocess.run(
+            ["git", "add", SURVEY_HISTORY_FILE],
+            check=True, capture_output=True, timeout=10,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Update survey history"],
+            check=True, capture_output=True, timeout=10,
+        )
+        subprocess.run(
+            ["git", "push"],
+            check=True, capture_output=True, timeout=30,
+        )
+        logger.info("[SURVEY-HISTORY] Committed and pushed survey history to repo")
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"[SURVEY-HISTORY] Git commit/push failed: {e.stderr}")
+    except Exception as e:
+        logger.warning(f"[SURVEY-HISTORY] Git commit/push failed: {e}")
 
 
 def build_past_questions_block():
