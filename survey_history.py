@@ -64,3 +64,40 @@ def save_survey_history(rounds_rows):
         logger.info(f"[SURVEY-HISTORY] Saved survey with {len(survey['rounds'])} rounds (total in history: {len(history)})")
     except Exception as e:
         logger.warning(f"[SURVEY-HISTORY] Failed to save survey: {e}")
+
+
+def build_past_questions_block():
+    """Build a prompt block listing all previously used questions.
+
+    Returns a string to inject into AI generation prompts so the AI
+    avoids repeating questions from past games.
+    """
+    history = load_survey_history()
+    if not history:
+        return ''
+
+    past_questions = []
+    for survey in history:
+        for rd in survey.get('rounds', []):
+            q = rd.get('question', '').strip()
+            if q:
+                past_questions.append(q)
+
+    if not past_questions:
+        return ''
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for q in past_questions:
+        if q.lower() not in seen:
+            seen.add(q.lower())
+            unique.append(q)
+
+    lines = [f'- {q}' for q in unique]
+    block = (
+        "IMPORTANT: Do NOT reuse any of these previously used questions:\n"
+        + '\n'.join(lines)
+    )
+    logger.info(f"[SURVEY-HISTORY] Built past questions block with {len(unique)} questions")
+    return block

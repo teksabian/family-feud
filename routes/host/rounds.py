@@ -11,7 +11,7 @@ from config import (
 )
 from auth import host_required
 from database import db_connect, get_setting, set_setting
-from survey_history import save_survey_history
+from survey_history import save_survey_history, build_past_questions_block
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
 from ai import (
@@ -594,7 +594,7 @@ def generate_questions():
     if not AI_SCORING_ENABLED:
         return jsonify({'success': False, 'error': 'AI is not enabled'}), 400
     try:
-        past_questions_block = ''
+        past_questions_block = build_past_questions_block()
         prompt = FEUD_QUESTIONS_PROMPT.format(past_questions_block=past_questions_block)
         response_text = _call_ai_for_generation(prompt)
         data = _parse_json_response(response_text)
@@ -630,7 +630,7 @@ def generate_round_data():
             lines.append(f'{idx + 1}. "{q}" ({config["answers"]} answers)')
         questions_block = '\n'.join(lines)
 
-        past_questions_block = ''
+        past_questions_block = build_past_questions_block()
         prompt = FEUD_ANSWERS_PROMPT.format(
             questions_block=questions_block,
             past_questions_block=past_questions_block,
