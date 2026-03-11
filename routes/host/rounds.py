@@ -11,6 +11,7 @@ from config import (
 )
 from auth import host_required
 from database import db_connect, get_setting, set_setting
+from survey_history import save_survey_history
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
 from ai import (
@@ -209,6 +210,7 @@ def upload_answers():
             os.remove(temp_path)
 
         rounds_created = len(rounds_data)
+        set_setting('rounds_source', 'upload', 'How current rounds were created')
         logger.info(f"[UPLOAD] Complete: {rounds_created} rounds created from '{file.filename}'")
         for idx, rd in enumerate(rounds_data):
             logger.debug(f"[UPLOAD]   Round {idx+1}: Q='{rd['question'][:60]}', {len(rd['answers'])} answers")
@@ -448,6 +450,18 @@ def start_next_round():
                 # No more rounds - game over
                 conn.commit()
                 logger.info(f"[ROUND] No round {current_num + 1} found - game complete!")
+
+                # Auto-save AI-generated surveys to history
+                if get_setting('rounds_source') == 'ai':
+                    try:
+                        all_rounds = conn.execute(
+                            "SELECT * FROM rounds ORDER BY round_number"
+                        ).fetchall()
+                        save_survey_history(all_rounds)
+                        logger.info("[ROUND] AI-generated survey saved to history")
+                    except Exception as e:
+                        logger.warning(f"[ROUND] Failed to save survey history: {e}")
+
                 flash('All rounds complete!', 'info'); return redirect(url_for('.host_dashboard'))
 
         conn.commit()
@@ -648,6 +662,7 @@ def generate_round_data():
                 logger.warning(f"[AI-GEN] Round {idx+1} points sum={total} (outside 85-100 range, but allowing)")
 
         logger.info("[AI-GEN] Generated round data for 8 rounds successfully")
+        set_setting('rounds_source', 'ai', 'How current rounds were created')
         return jsonify({'success': True, 'feud_data': {'rounds': rounds}})
     except Exception as e:
         logger.error(f"[AI-GEN] generate_round_data error: {e}", exc_info=True)

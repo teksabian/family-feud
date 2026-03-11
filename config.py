@@ -119,6 +119,7 @@ logger.info(f"Reset counter initialized: {reset_state['counter']}")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "feud.db")
 CORRECTIONS_FILE = os.path.join(BASE_DIR, "corrections_history.json")
+SURVEY_HISTORY_FILE = os.path.join(BASE_DIR, "survey_history.json")
 
 # ===== HOST AUTHENTICATION =====
 HOST_PASSWORD = os.environ.get('HOST_PASSWORD', 'localdev')
