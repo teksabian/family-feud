@@ -574,9 +574,12 @@ def scored_teams():
             submissions_data.append(sub_dict)
 
     logger.debug(f"[SCORING] scored_teams() - {len(submissions_data)} scored teams for round {active_round['round_number']}")
+    from routes.host.codes import get_qr_base_url
     return render_template('scored_teams.html',
                          round=dict(active_round),
-                         submissions=submissions_data)
+                         submissions=submissions_data,
+                         tv_board_enabled=(get_setting('tv_board_enabled', 'false') == 'true'),
+                         qr_base_url=get_qr_base_url())
 
 @scoring_bp.route('/host/ai-accepted-summary')
 @host_required

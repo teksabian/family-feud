@@ -94,7 +94,8 @@ def host_dashboard():
                          rounds_config=ROUNDS_CONFIG,
                          ai_scoring_available=AI_SCORING_ENABLED,
                          scan_token=scan_token,
-                         qr_base_url=qr_base_url)
+                         qr_base_url=qr_base_url,
+                         tv_board_enabled=(get_setting('tv_board_enabled', 'false') == 'true'))
 
 
 @host_bp.route('/host/settings', methods=['GET', 'POST'])
