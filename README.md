@@ -344,4 +344,4 @@ Private use for Game Night Guild pub trivia events.
 
 ---
 
-**v4.0.0 - Plasma** | Battle-tested at actual pub nights | Survey SAYS: production ready. 🍻
+**v4.1.0 - Plasma** | Battle-tested at actual pub nights | Survey SAYS: production ready. 🍻

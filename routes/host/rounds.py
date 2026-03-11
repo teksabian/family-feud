@@ -11,6 +11,7 @@ from config import (
 )
 from auth import host_required
 from database import db_connect, get_setting, set_setting
+from survey_history import save_survey_history, build_past_questions_block
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
 from ai import (
@@ -209,6 +210,7 @@ def upload_answers():
             os.remove(temp_path)
 
         rounds_created = len(rounds_data)
+        set_setting('rounds_source', 'upload', 'How current rounds were created')
         logger.info(f"[UPLOAD] Complete: {rounds_created} rounds created from '{file.filename}'")
         for idx, rd in enumerate(rounds_data):
             logger.debug(f"[UPLOAD]   Round {idx+1}: Q='{rd['question'][:60]}', {len(rd['answers'])} answers")
@@ -448,6 +450,18 @@ def start_next_round():
                 # No more rounds - game over
                 conn.commit()
                 logger.info(f"[ROUND] No round {current_num + 1} found - game complete!")
+
+                # Auto-save AI-generated surveys to history
+                if get_setting('rounds_source') == 'ai':
+                    try:
+                        all_rounds = conn.execute(
+                            "SELECT * FROM rounds ORDER BY round_number"
+                        ).fetchall()
+                        save_survey_history(all_rounds)
+                        logger.info("[ROUND] AI-generated survey saved to history")
+                    except Exception as e:
+                        logger.warning(f"[ROUND] Failed to save survey history: {e}")
+
                 flash('All rounds complete!', 'info'); return redirect(url_for('.host_dashboard'))
 
         conn.commit()
@@ -487,12 +501,20 @@ def update_single_answer(round_id, answer_num):
         return redirect(url_for('.host_dashboard'))
 
     with db_connect() as conn:
-        new_count = int(request.form.get('count', 0) or 0)
-        conn.execute(f"""
-            UPDATE rounds
-            SET answer{answer_num} = ?, answer{answer_num}_count = ?
-            WHERE id = ?
-        """, (new_answer, new_count, round_id))
+        # Only update count if the form included the count field (answer #1 edit form)
+        if 'count' in request.form:
+            new_count = int(request.form.get('count', 0) or 0)
+            conn.execute(f"""
+                UPDATE rounds
+                SET answer{answer_num} = ?, answer{answer_num}_count = ?
+                WHERE id = ?
+            """, (new_answer, new_count, round_id))
+        else:
+            conn.execute(f"""
+                UPDATE rounds
+                SET answer{answer_num} = ?
+                WHERE id = ?
+            """, (new_answer, round_id))
 
         conn.commit()
 
@@ -572,7 +594,7 @@ def generate_questions():
     if not AI_SCORING_ENABLED:
         return jsonify({'success': False, 'error': 'AI is not enabled'}), 400
     try:
-        past_questions_block = ''
+        past_questions_block = build_past_questions_block()
         prompt = FEUD_QUESTIONS_PROMPT.format(past_questions_block=past_questions_block)
         response_text = _call_ai_for_generation(prompt)
         data = _parse_json_response(response_text)
@@ -608,7 +630,7 @@ def generate_round_data():
             lines.append(f'{idx + 1}. "{q}" ({config["answers"]} answers)')
         questions_block = '\n'.join(lines)
 
-        past_questions_block = ''
+        past_questions_block = build_past_questions_block()
         prompt = FEUD_ANSWERS_PROMPT.format(
             questions_block=questions_block,
             past_questions_block=past_questions_block,
@@ -634,12 +656,13 @@ def generate_round_data():
             for ans in answers:
                 if 'text' not in ans or 'points' not in ans:
                     return jsonify({'success': False, 'error': f'Round {idx+1}: answers must have "text" and "points"'}), 500
-            # Check points sum (lenient: 80-110)
+            # Check points sum (target: 93-97, lenient: 85-100)
             total = sum(a['points'] for a in answers)
-            if total < 80 or total > 110:
-                logger.warning(f"[AI-GEN] Round {idx+1} points sum={total} (outside 80-110 range, but allowing)")
+            if total < 85 or total > 100:
+                logger.warning(f"[AI-GEN] Round {idx+1} points sum={total} (outside 85-100 range, but allowing)")
 
         logger.info("[AI-GEN] Generated round data for 8 rounds successfully")
+        set_setting('rounds_source', 'ai', 'How current rounds were created')
         return jsonify({'success': True, 'feud_data': {'rounds': rounds}})
     except Exception as e:
         logger.error(f"[AI-GEN] generate_round_data error: {e}", exc_info=True)
