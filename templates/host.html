@@ -1871,9 +1871,9 @@
                 revealBtns.innerHTML = html;
             }
 
-            // Listen for TV events
+            // Listen for TV events — re-fetch from REST for complete round data
             socket.on('tv:state_update', function(state) {
-                tvApplyState(state);
+                tvFetchState();
             });
             socket.on('tv:screen_change', function(data) {
                 if (data && data.screen) {

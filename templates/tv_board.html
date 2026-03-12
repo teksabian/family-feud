@@ -428,9 +428,9 @@
         connDot.classList.remove('connected');
     });
 
-    // Full state sync
+    // Full state sync — re-fetch from REST for complete round data
     socket.on('tv:state_update', (state) => {
-        applyState(state);
+        fetchState();
     });
 
     // Screen change only
@@ -447,6 +447,11 @@
             revealedSet.add(num);
             revealTile(num, true);
         }
+    });
+
+    // Round activation — re-fetch state to pick up new round
+    socket.on('round:started', () => {
+        fetchState();
     });
 
     // ── Init ───────────────────────────────────────────────────

@@ -328,6 +328,12 @@ def activate_round(round_id):
             socketio.emit('round:started', round_started_data, to='teams')
             socketio.emit('round:started', round_started_data, to='hosts')
 
+            # Auto-sync TV board if enabled
+            if get_setting('tv_board_enabled', 'false') == 'true':
+                from tv_state import reset_for_round, get_tv_state
+                reset_for_round(round_info['id'])
+                socketio.emit('tv:state_update', get_tv_state(), to='tv')
+
             logger.info(f"[ROUND] activate_round() - round_id={round_id} now active (deactivated all others)")
             flash(f'\u2705 Round activated: {round_data["question"]}', 'success')
         except Exception as e:
@@ -445,6 +451,13 @@ def start_next_round():
 
                 socketio.emit('round:started', round_started_data, to='teams')
                 socketio.emit('round:started', round_started_data, to='hosts')
+
+                # Auto-sync TV board if enabled
+                if get_setting('tv_board_enabled', 'false') == 'true':
+                    from tv_state import reset_for_round, get_tv_state
+                    reset_for_round(next_round['id'])
+                    socketio.emit('tv:state_update', get_tv_state(), to='tv')
+
                 logger.info(f"[ROUND] Activated round {current_num + 1} (id={next_round['id']})")
             else:
                 # No more rounds - game over
