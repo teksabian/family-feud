@@ -1848,6 +1848,13 @@
 
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
+            // In advanced_pp mode, skip winner interstitial — scores/answers
+            // are revealed via the TV board, not the winner screen
+            if (typeof mobileExperience !== 'undefined' && mobileExperience === 'advanced_pp') {
+                if (typeof scoresRevealed !== 'undefined') scoresRevealed = false;
+                window.location.href = '/play';
+                return;
+            }
             if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
                 showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
             } else {
