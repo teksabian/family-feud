@@ -1101,13 +1101,14 @@
         }
 
         function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
+            var hideDetails = (typeof mobileExperience !== 'undefined' && mobileExperience === 'advanced_pp');
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
-            document.getElementById('winner-score').textContent = score;
-
-            // Show tiebreaker badge if won on tiebreaker
+            document.getElementById('winner-score').textContent = hideDetails ? '???' : score;
             var scoreEl = document.getElementById('winner-score').parentElement;
-            if (wonOnTiebreaker) {
+            if (hideDetails) scoreEl.style.display = 'none';
+
+            if (!hideDetails && wonOnTiebreaker) {
                 var tbDiv = document.createElement('div');
                 tbDiv.className = 'winner-tiebreaker';
                 tbDiv.textContent = 'Won on Tiebreaker!';
@@ -1115,7 +1116,7 @@
             }
 
             var answersEl = document.getElementById('winner-answers');
-            if (answersEl && question && answers && answers.length > 0) {
+            if (!hideDetails && answersEl && question && answers && answers.length > 0) {
                 var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
                 answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
                 html += '</ol>';
@@ -1134,6 +1135,10 @@
 
             document.getElementById('winner-interstitial').style.display = 'block';
             winnerShown = true;
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setTimeout(function() { confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } }); }, 400);
+            }
         }
     </script>
 
@@ -1259,13 +1264,14 @@
         }
 
         function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
+            var hideDetails = (typeof mobileExperience !== 'undefined' && mobileExperience === 'advanced_pp');
             document.getElementById('winner-round-label').textContent = 'Round ' + roundNum;
             document.getElementById('winner-name').textContent = teamName;
-            document.getElementById('winner-score').textContent = score;
-
-            // Show tiebreaker badge if won on tiebreaker
+            document.getElementById('winner-score').textContent = hideDetails ? '???' : score;
             var scoreEl = document.getElementById('winner-score').parentElement;
-            if (wonOnTiebreaker) {
+            if (hideDetails) scoreEl.style.display = 'none';
+
+            if (!hideDetails && wonOnTiebreaker) {
                 var tbDiv = document.createElement('div');
                 tbDiv.className = 'winner-tiebreaker';
                 tbDiv.textContent = 'Won on Tiebreaker!';
@@ -1273,7 +1279,7 @@
             }
 
             var answersEl = document.getElementById('winner-answers');
-            if (answersEl && question && answers && answers.length > 0) {
+            if (!hideDetails && answersEl && question && answers && answers.length > 0) {
                 var html = '<div class="winner-answers-question">' + question.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div><ol>';
                 answers.forEach(function(a) { html += '<li>' + a.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>'; });
                 html += '</ol>';
@@ -1292,6 +1298,10 @@
 
             document.getElementById('winner-interstitial').style.display = 'block';
             winnerShown = true;
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setTimeout(function() { confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } }); }, 400);
+            }
         }
     </script>
 
@@ -1635,11 +1645,12 @@
         function showWinnerInterstitial(teamName, score, roundNum, question, answers, wonOnTiebreaker, tiebreakerAnswer) {
             var card = document.querySelector('.card');
             if (!card) return;
+            var hideDetails = (typeof mobileExperience !== 'undefined' && mobileExperience === 'advanced_pp');
 
-            var tiebreakerHtml = wonOnTiebreaker ? '<div class="winner-tiebreaker">Won on Tiebreaker!</div>' : '';
+            var tiebreakerHtml = (!hideDetails && wonOnTiebreaker) ? '<div class="winner-tiebreaker">Won on Tiebreaker!</div>' : '';
 
             var answersHtml = '';
-            if (question && answers && answers.length > 0) {
+            if (!hideDetails && question && answers && answers.length > 0) {
                 var escapedQ = question.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 answersHtml = '<div class="winner-answers"><div class="winner-answers-question">' + escapedQ + '</div><ol>';
                 answers.forEach(function(a) {
@@ -1652,6 +1663,9 @@
                 answersHtml += '</div>';
             }
 
+            var scoreHtml = hideDetails ? '' :
+                '<div class="winner-score"><span>' + score + '</span> Points</div>';
+
             card.innerHTML = '';
             var interstitial = document.createElement('div');
             interstitial.className = 'winner-interstitial';
@@ -1661,12 +1675,16 @@
                 '<div class="winner-round-label">Round ' + roundNum + '</div>' +
                 '<div class="winner-heading">WINNER</div>' +
                 '<div class="winner-name">' + teamName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
-                '<div class="winner-score"><span>' + score + '</span> Points</div>' +
+                scoreHtml +
                 tiebreakerHtml +
                 answersHtml +
                 '<button class="winner-next-btn" onclick="window.location.href=\'/play\'">Next Round &rarr;</button>';
             card.appendChild(interstitial);
             winnerShown = true;
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setTimeout(function() { confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } }); }, 400);
+            }
         }
 
         // ======== AUTO-SAVE ========
@@ -1811,6 +1829,7 @@
     {% endif %}
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <script>
         const socket = io();
 
@@ -1848,13 +1867,7 @@
 
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
-            // In advanced_pp mode, skip winner interstitial — scores/answers
-            // are revealed via the TV board, not the winner screen
-            if (typeof mobileExperience !== 'undefined' && mobileExperience === 'advanced_pp') {
-                if (typeof scoresRevealed !== 'undefined') scoresRevealed = false;
-                window.location.href = '/play';
-                return;
-            }
+            if (typeof scoresRevealed !== 'undefined') scoresRevealed = false;
             if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
                 showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
             } else {

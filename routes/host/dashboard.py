@@ -210,8 +210,9 @@ def set_mobile_experience():
     mode = request.form.get('mode', 'advanced_no_pp')
     if mode in ('basic', 'advanced_no_pp', 'advanced_pp'):
         if mode == 'advanced_pp' and get_setting('tv_board_enabled', 'true') != 'true':
-            flash('Advanced (PP Display) requires TV Board to be enabled', 'error')
-            return redirect(url_for('.settings'))
+            set_setting('tv_board_enabled', 'true', 'TV Board display enabled/disabled')
+            flash('TV Board auto-enabled for PP Display mode', 'info')
+            logger.info("[SETTINGS] TV Board auto-enabled for advanced_pp mode")
         set_setting('mobile_experience', mode, 'Mobile experience mode for team screens')
         labels = {'basic': 'Basic', 'advanced_no_pp': 'Advanced (No PP Display)', 'advanced_pp': 'Advanced (PP Display)'}
         flash(f'Mobile experience set to: {labels.get(mode, mode)}', 'success')
