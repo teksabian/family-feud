@@ -86,6 +86,15 @@
             font-size: 1.1em;
         }
 
+        .presented-by {
+            color: var(--text-muted);
+            text-align: center;
+            font-size: 0.75em;
+            margin-bottom: 8px;
+            opacity: 0.8;
+            text-transform: lowercase;
+        }
+
         @media (max-width: 400px) {
             .logo h1 {
                 font-size: 2em;
@@ -176,14 +185,16 @@
 </head>
 <body>
     <div class="container">
+        <div class="logo">
+            <h1>FAMILY FEUD</h1>
+            <p class="presented-by">presented by</p>
+        </div>
+
         <div class="brand-logo">
             <img src="{{ url_for('static', filename='logo.png') }}?v={{ cache_bust }}" alt="Game Night Guild">
         </div>
-        
-        <div class="logo">
-            <h1>PUB FAMILY FEUD</h1>
-            <p>Join the Fun!</p>
-        </div>
+
+        <p class="logo" style="margin-bottom: 20px;"><span style="color: var(--text); font-size: 1.1em;">Join the Fun!</span></p>
         
         {% if error %}
         <div class="error">
@@ -294,7 +305,7 @@
         </div>
         
         <div class="footer">
-            Family Feud Pub Edition
+            Family Feud — presented by Game Night Guild
         </div>
     </div>
 </body>
