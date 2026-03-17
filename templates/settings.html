@@ -495,14 +495,14 @@
                     <select name="mode" id="mobile_experience" onchange="this.closest('form').submit()" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 1em; cursor: pointer;">
                         <option value="basic" {% if mobile_experience == 'basic' %}selected{% endif %}>Basic</option>
                         <option value="advanced_no_pp" {% if mobile_experience == 'advanced_no_pp' %}selected{% endif %}>Advanced (No PP Display)</option>
-                        <option value="advanced_pp" disabled>Advanced (PP Display) — Coming Soon</option>
+                        <option value="advanced_pp" {% if mobile_experience == 'advanced_pp' %}selected{% endif %}>Advanced (PP Display)</option>
                     </select>
                 </div>
             </form>
             <div class="help-text">
                 <strong>Basic:</strong> Classic waiting screen after submission<br>
                 <strong>Advanced (No PP Display):</strong> Live leaderboard on team screens — best for games without a PowerPoint reveal<br>
-                <strong>Advanced (PP Display):</strong> Live leaderboard with hidden scores until reveal — for PowerPoint games (coming soon)
+                <strong>Advanced (PP Display):</strong> Live leaderboard with hidden scores until reveal — for PowerPoint games (requires TV Board enabled)
             </div>
         </div>
 
@@ -528,6 +528,14 @@
         <!-- TV Board Display -->
         <div class="card">
             <h2>📺 TV Board Display</h2>
+            {% if mobile_experience == 'advanced_pp' %}
+            <div class="toggle-container">
+                <span class="toggle-label">📺 Enable TV Board Display</span>
+                <div class="toggle-switch active" style="opacity:0.6;cursor:not-allowed;" title="Required by Advanced (PP Display) mode">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            {% else %}
             <form method="POST" action="{{ url_for('host.toggle_setting') }}?v={{ cache_bust }}">
                 <input type="hidden" name="setting_key" value="tv_board_enabled">
                 <div class="toggle-container">
@@ -538,8 +546,11 @@
                     </div>
                 </div>
             </form>
+            {% endif %}
             <p class="help-text">
-                {% if tv_board_enabled %}
+                {% if mobile_experience == 'advanced_pp' %}
+                    TV Board is required by Advanced (PP Display) mode and cannot be disabled.
+                {% elif tv_board_enabled %}
                     TV Board is enabled — use the /tv/board URL on your display screen.
                 {% else %}
                     Enable to show a live answer-reveal board on a connected TV/display.

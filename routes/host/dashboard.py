@@ -199,6 +199,11 @@ def toggle_setting():
                 flash('\U0001f4fa TV Board enabled', 'success')
             else:
                 flash('\U0001f4fa TV Board disabled', 'success')
+                # If advanced_pp requires TV Board, fall back to advanced_no_pp
+                if get_setting('mobile_experience', 'advanced_no_pp') == 'advanced_pp':
+                    set_setting('mobile_experience', 'advanced_no_pp', 'Mobile experience mode for team screens')
+                    flash('Mobile experience switched to Advanced (No PP Display) — TV Board is required for PP Display mode', 'info')
+                    logger.info("[SETTINGS] mobile_experience auto-switched to advanced_no_pp (TV Board disabled)")
 
     return redirect(url_for('.settings'))
 
@@ -209,6 +214,10 @@ def set_mobile_experience():
     """Set the mobile experience mode"""
     mode = request.form.get('mode', 'advanced_no_pp')
     if mode in ('basic', 'advanced_no_pp', 'advanced_pp'):
+        if mode == 'advanced_pp' and get_setting('tv_board_enabled', 'true') != 'true':
+            set_setting('tv_board_enabled', 'true', 'TV Board display enabled/disabled')
+            flash('TV Board auto-enabled for PP Display mode', 'info')
+            logger.info("[SETTINGS] TV Board auto-enabled for advanced_pp mode")
         set_setting('mobile_experience', mode, 'Mobile experience mode for team screens')
         labels = {'basic': 'Basic', 'advanced_no_pp': 'Advanced (No PP Display)', 'advanced_pp': 'Advanced (PP Display)'}
         flash(f'Mobile experience set to: {labels.get(mode, mode)}', 'success')
