@@ -1,4 +1,4 @@
-# Family Feud — Pub Trivia Game
+# Family Feud — Pub Trivia Game by Game Night Guild
 
 *A Flask-powered Family Feud clone for pub trivia nights. Teams join via QR codes, AI does the homework, and the database deletes itself when you're done.*
 
