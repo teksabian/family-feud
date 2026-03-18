@@ -51,33 +51,160 @@ The bartender will not need to help anyone with setup.
 
 ---
 
-## Game Flow
+## How to Run a Game (Step by Step)
 
-1. **Setup** (Host)
-   - Create rounds and set correct answers (or load a prebuilt survey)
-   - Generate team codes
-   - Print code cards with QR codes
+*Everything you need to know, even if you've never touched the app before.*
 
-2. **Team Registration**
-   - Teams scan QR or visit join page
-   - Enter code and team name
+---
 
-3. **Game Play**
-   - Activate a round
-   - Teams submit answers via mobile
-   - Broadcast a message if you need to get everyone's attention
-   - Close submissions when ready
+### Step 1: Before the Game (Setup at Home)
 
-4. **Scoring**
-   - Review submissions in the scoring queue
-   - Use AI scoring for semantic matching, or score manually
-   - *(Survey SAYS... the AI is usually right, but the host always wins)*
-   - Award points; undo is available if you change your mind
+You'll do this once before heading to the venue. Takes about 5 minutes.
 
-5. **Winner**
-   - View leaderboard
-   - Announce winner
-   - Advance to next round or wrap up the night
+1. **Open the host dashboard** — go to `/host` in your browser and enter your PIN password.
+2. **Load your questions.** You have three options:
+   - **Easiest:** Pick a prebuilt survey from the dropdown (10 included — enough for your first few nights).
+   - **Custom:** Upload a `.docx` or `.pptx` file with your own survey questions.
+   - **Manual:** Create rounds one at a time from the dashboard.
+3. **Understand the structure.** Every game has **8 rounds**. Each round has one question (e.g., *"Name something people do on their lunch break"*) and **3–6 ranked answers** based on a survey. The #1 answer is worth the most points, the last answer is worth the least.
+4. **Print QR code cards** from the dashboard — one card per team. Each card has a unique 4-letter code and a QR code that links straight to the join page. *(Landscape or portrait — your call.)*
+5. **Optionally print paper answer sheets** if you want teams to write answers by hand instead of using their phones.
+6. **Tweak your settings** (`/host/settings`):
+   - Pick a color theme (classic, dark, forest, stadium, or gamenight)
+   - Set the QR base URL if you're using a custom domain
+   - Choose a mobile experience mode (basic, advanced, or advanced with photo play)
+   - Turn AI scoring on or off
+7. **Optionally enable the TV Board** if you have a projector or big screen for the dramatic answer reveals.
+
+> **Pro tip:** Bookmark `/host/scan` on your phone before you leave the house. You'll thank yourself later.
+
+---
+
+### Step 2: At the Venue — Team Registration
+
+1. **Hand out QR code cards** to each table (or display a big QR on a screen).
+2. **Teams scan the QR code** with their phone camera. It opens the join page automatically.
+3. Teams enter the **4-letter code** printed on their card (e.g., `HBKM`). No I, O, or L in the codes — those letters cause too many arguments.
+4. Teams pick a **team name** (max 30 characters — keep it pub-friendly).
+5. That's it. They're in. No app to install, no account to create.
+6. **On your dashboard**, you'll see each team appear as they join. Green dot = online. Grey dot = they went to the bar.
+7. **If a team loses connection** (phone dies, Wi-Fi drops, someone closes the tab), they can rejoin by entering their code and team name again. No progress lost.
+
+---
+
+### Step 3: Playing a Round
+
+*Repeat this for each of the 8 rounds.*
+
+1. **Activate the round** from your host dashboard. Tap the round number, then "Activate."
+2. **Every team's phone instantly updates** — they see the question and a set of blank answer fields (3–6 fields, depending on the round).
+3. **Teams type their guesses.** Example: If the question is *"Name something you'd find in a junk drawer,"* a team might type: *Batteries, Tape, Scissors, Pens, Rubber Bands.*
+4. **Teams enter a tiebreaker** — a number from 0 to 100, representing their guess for what percentage of survey respondents gave the #1 answer. *(This breaks ties later. Tell them to guess, not overthink it.)*
+5. **Teams hit Submit.** One shot per round — no editing after submission. Make it count.
+6. **You'll see a live counter** on your dashboard: "12 of 15 teams submitted." Use this to know when to move on.
+7. **Close submissions** when you're ready — either when all teams have submitted, or when you decide time's up. Tap "Close Submissions" on the dashboard.
+
+> **Need everyone's attention?** Use the **Broadcast** feature to send a message (up to 200 characters) to every team's phone. It pops up as a banner they can't ignore.
+
+---
+
+### Step 4: Scoring — Digital Submissions (Phones)
+
+*This is how you score when teams submitted answers from their phones.*
+
+1. **Open the Scoring Queue** from your dashboard.
+2. **For each team**, you'll see:
+   - The team's submitted answers on one side
+   - The correct survey answers on the other side
+3. **Check the boxes** next to each answer the team got right. The app does the math for you.
+   - **How points work:** The #1 survey answer is worth the most points, and each answer below it is worth one less. If a round has 5 answers, matching the #1 answer earns 5 points, #2 earns 4, #3 earns 3, and so on.
+4. **Or let the AI do it.** If AI scoring is enabled, tap "AI Score" — the AI reads the team's answers, figures out which ones match (including synonyms, abbreviations, and creative spellings), and suggests checkboxes. You review the suggestions and accept or adjust.
+   - *"Minivan" matches "Van." "NYC" matches "New York." "Sammich" matches "Sandwich." The AI gets it.*
+5. **Confirm the score.** The team immediately sees their result on their phone.
+6. **Repeat** for every team's submission in the queue.
+
+> **Made a mistake?** Scores can be undone or edited at any time. Nobody has to know.
+
+---
+
+### Step 5: Scoring — Paper Answer Sheets + Photo Scan
+
+*This is the alternative for teams that wrote answers on paper instead of phones.*
+
+1. **Collect the paper answer sheets** from the tables.
+2. **Open `/host/scan`** on your phone (that bookmark you made in Step 1 — told you).
+3. **Snap a photo** of each answer sheet.
+4. **The AI reads the handwriting** and extracts: team code, team name, answers, and tiebreaker. Fields it's not sure about are highlighted in orange with a "CHECK" badge.
+5. **Review the extracted data** — fix anything the AI got wrong (messy handwriting happens).
+6. **Hit Submit** — the answers go into the Scoring Queue, where you score them the same way as digital submissions (Step 4).
+
+---
+
+### Step 6: After Scoring a Round
+
+1. **The leaderboard updates automatically** on every team's phone. No refresh needed.
+2. **View the scored teams list** on your dashboard — teams ranked by score, with tiebreaker distance shown.
+3. **Undo or edit** any score if you catch a mistake. The "previous score" is saved so you can always revert.
+4. **Check the "AI Accepted Answers" summary** — it shows which synonyms and alternate answers the AI counted as correct. Announce these to the room so teams stop arguing. *(They will argue anyway.)*
+
+---
+
+### Step 7: The TV Board — Big Screen Reveals *(Optional but Awesome)*
+
+*This is the dramatic, Family-Feud-style answer reveal on a projector or TV. Skip this if you don't have a big screen.*
+
+1. **Enable TV Board** in `/host/settings`.
+2. **Open `/tv/board`** in a browser on the computer connected to your projector/TV. This page is full-screen and doesn't require a login.
+3. **Control the board from your phone** — go to `/host/reveal-control` (or scan the QR code shown on your dashboard).
+4. **Switch screens** to set the mood:
+   - **Welcome** → show before the game starts
+   - **Rules** → quick rules overview
+   - **Question** → displays the current round's question in big text
+   - **Board** → the answer board with hidden tiles
+   - **Halftime** → break screen
+   - **Closing** → end-of-night screen
+5. **Reveal answers one by one.** On the Board screen, tap each answer tile to flip it from blue (hidden) to gold (revealed). Classic Family Feud flip animation included.
+6. **"And The Survey Says..."** — tap this button for maximum drama. A 3-2-1 countdown plays, then the #1 answer is revealed.
+7. **"Reveal All"** — shows all remaining answers in sequence (one per second). Use this when you're ready to move on.
+
+---
+
+### Step 8: Between Rounds
+
+1. **Broadcast a message** if you need to ("Round 3 starting in 2 minutes — grab a drink!").
+2. **Activate the next round** from your dashboard.
+3. **Teams' phones auto-update** — they see the new question and fresh answer fields immediately.
+4. **Repeat Steps 3–7** for all 8 rounds.
+
+---
+
+### Step 9: End of the Night
+
+1. **View the final leaderboard** — cumulative scores across all 8 rounds.
+2. **Announce the winner.** Buy them a round. Or don't. Your call.
+3. **For a second game** (same night): Hit **"Reset"** — clears all scores and rounds but keeps teams joined. Load a new survey and go again.
+4. **To fully reset**: Hit **"Reset All"** — wipes everything. Teams see a "Game Over" screen and have to rejoin from scratch.
+5. **Or just shut down the server** — it wipes the database on every startup anyway. That's by design. See [Nuclear Reset](#nuclear-reset-scorched-earth-policy).
+
+---
+
+### Host Cheat Sheet
+
+| What | Where |
+|---|---|
+| Host dashboard | `/host` |
+| Settings | `/host/settings` |
+| Photo scan (mobile) | `/host/scan` |
+| Scoring queue | `/host/scoring-queue` |
+| TV board (projector) | `/tv/board` |
+| Reveal control (phone) | `/host/reveal-control` |
+| Print QR cards | `/host/print-codes` |
+| Print answer sheets | `/host/print-answer-sheets` |
+
+> **Three mobile experience modes:**
+> - **Basic** — Teams submit answers only. Simple, fast, no distractions.
+> - **Advanced** — Submit answers + see the live leaderboard on their phone.
+> - **Advanced + Photo Play** — Full experience including photo features. Auto-enables the TV Board.
 
 ---
 
