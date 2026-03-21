@@ -71,7 +71,7 @@
         }
 
         .view-badge {
-            background: rgba(255,255,255,0.1);
+            background: color-mix(in srgb, var(--text) 10%, transparent);
             color: var(--text-muted);
             font-size: 0.8em;
             padding: 3px 8px;
@@ -225,7 +225,7 @@
             align-items: center;
             gap: 12px;
             padding: 12px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid var(--card-border);
         }
 
         .answer-result:last-child {
@@ -233,7 +233,7 @@
         }
 
         .answer-num {
-            background: rgba(255,255,255,0.15);
+            background: color-mix(in srgb, var(--text) 15%, transparent);
             color: var(--text-muted);
             width: 28px;
             height: 28px;
@@ -253,7 +253,7 @@
 
         .answer-num.incorrect {
             background: rgba(220,53,69,0.15);
-            color: #666;
+            color: var(--text-muted);
         }
 
         .answer-text-col {
@@ -262,7 +262,7 @@
         }
 
         .answer-text {
-            color: #ccc;
+            color: var(--text-muted);
             font-size: 1em;
             word-break: break-word;
         }
@@ -272,7 +272,7 @@
         }
 
         .correct-answer-label {
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.8em;
             margin-top: 2px;
         }
@@ -292,23 +292,23 @@
         }
 
         .answer-points.zero {
-            color: #666;
+            color: var(--text-muted);
         }
 
         .tiebreaker-display {
             margin-top: 15px;
             padding-top: 15px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid var(--card-border);
         }
 
         .tiebreaker-label {
-            color: #999;
+            color: var(--text-muted);
             font-weight: bold;
             font-size: 0.9em;
         }
 
         .tiebreaker-value {
-            color: #ccc;
+            color: var(--text);
             margin-left: 10px;
         }
 
