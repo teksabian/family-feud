@@ -487,7 +487,7 @@
                     <label for="num-rounds-select">Number of Rounds</label>
                     <select id="num-rounds-select">
                         {% for n in range(min_rounds, max_rounds + 1) %}
-                        <option value="{{ n }}" {% if n == 8 %}selected{% endif %}>{{ n }} rounds</option>
+                        <option value="{{ n }}" {% if n == default_num_rounds %}selected{% endif %}>{{ n }} rounds</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -495,7 +495,7 @@
                     <label for="default-answers-select">Default Answers Per Round</label>
                     <select id="default-answers-select">
                         {% for n in range(min_answers, max_answers + 1) %}
-                        <option value="{{ n }}" {% if n == 4 %}selected{% endif %}>{{ n }} answers</option>
+                        <option value="{{ n }}" {% if n == default_answers_per_round %}selected{% endif %}>{{ n }} answers</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -503,7 +503,7 @@
         </div>
 
         <form method="POST" action="{{ url_for('host.create_round_manual_submit') }}?v={{ cache_bust }}" onsubmit="return validateAllRounds(this)">
-        <input type="hidden" name="num_rounds" id="num-rounds-hidden" value="8">
+        <input type="hidden" name="num_rounds" id="num-rounds-hidden" value="{{ default_num_rounds }}">
         <div class="survey-selector">
             <label for="survey-dropdown">Pre-Built Survey (auto-fill all rounds):</label>
             <select id="survey-dropdown">

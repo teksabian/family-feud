@@ -19,7 +19,9 @@ from ai import (
     get_current_generation_model,
 )
 
-from routes.host import host_bp, ROUNDS_CONFIG, DEFAULT_ROUNDS_CONFIG, build_rounds_config, MIN_ROUNDS, MAX_ROUNDS, MIN_ANSWERS, MAX_ANSWERS
+from routes.host import (host_bp, ROUNDS_CONFIG, DEFAULT_ROUNDS_CONFIG, build_rounds_config,
+                         MIN_ROUNDS, MAX_ROUNDS, MIN_ANSWERS, MAX_ANSWERS,
+                         DEFAULT_NUM_ROUNDS, DEFAULT_ANSWERS_PER_ROUND)
 
 # Pre-built surveys for quick round creation via dropdown
 PREBUILT_SURVEYS = {
@@ -562,7 +564,9 @@ def create_round_manual_form():
                          min_rounds=MIN_ROUNDS,
                          max_rounds=MAX_ROUNDS,
                          min_answers=MIN_ANSWERS,
-                         max_answers=MAX_ANSWERS)
+                         max_answers=MAX_ANSWERS,
+                         default_num_rounds=DEFAULT_NUM_ROUNDS,
+                         default_answers_per_round=DEFAULT_ANSWERS_PER_ROUND)
 
 @host_bp.route('/host/create-round-manual/submit', methods=['POST'])
 @host_required
@@ -667,13 +671,18 @@ def generate_round_data():
             return jsonify({'success': False, 'error': 'Must provide questions'}), 400
         questions = body['questions']
 
-        # Build rounds config from request body or fall back to default
+        # Build rounds config from request body, validated through build_rounds_config
         submitted_config = body.get('rounds_config', None)
         if submitted_config and len(submitted_config) == len(questions):
-            rounds_config = submitted_config
+            per_round_answers = {}
+            for item in submitted_config:
+                r = item.get('round') if isinstance(item, dict) else None
+                a = item.get('answers') if isinstance(item, dict) else None
+                if isinstance(r, int) and isinstance(a, int):
+                    per_round_answers[r] = a
+            rounds_config = build_rounds_config(len(questions), DEFAULT_ANSWERS_PER_ROUND, per_round_answers)
         else:
-            num_rounds = len(questions)
-            rounds_config = build_rounds_config(num_rounds)
+            rounds_config = build_rounds_config(len(questions))
 
         num_rounds = len(rounds_config)
         if len(questions) != num_rounds:

@@ -141,7 +141,7 @@ def parse_docx(filepath):
                     question = parts[1].strip()
                     questions.append(question)
 
-    # ROBUST: Parse ALL 8 tables regardless of question count
+    # ROBUST: Parse up to 12 tables regardless of question count
     for table_idx, table in enumerate(doc.tables):
         if table_idx >= 12:
             break
