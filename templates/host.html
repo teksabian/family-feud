@@ -1196,8 +1196,9 @@
             </div>
             
             <!-- Right Column: Controls -->
-            <div style="display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
-                
+            <div style="position: relative;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow-y: auto; gap: 20px;">
+
                 <!-- Create Rounds - Combined (only if no rounds exist) -->
                 {% if not rounds %}
                 <div class="card" style="border-color: #ffd700; padding: 15px;">
@@ -1277,12 +1278,6 @@
                             MANUAL ENTRY
                         </button>
                     </a>
-
-                    {% if ai_scoring_available %}
-                    <p style="color: var(--text-muted); font-size: 0.85em; margin-top: 15px;">
-                        📷 Scan the QR code in the header to open Photo Scan on your phone (no password needed)
-                    </p>
-                    {% endif %}
 
                 </div>
                 {% endif %}
@@ -1433,10 +1428,11 @@
                         }
                     </script>
                 </div>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Footer Area - Logout Button -->
     <div class="container" style="padding: 40px 0; text-align: left;">
         <a href="{{ url_for('auth.host_logout') }}?v={{ cache_bust }}" style="display: inline-block; padding: 10px 20px; background: #dc3545; color: white; text-decoration: none; border-radius: 8px; font-size: 0.9em; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.3s;" onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
