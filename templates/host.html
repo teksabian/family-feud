@@ -1663,6 +1663,11 @@
             if (typeof refreshCodes === 'function') refreshCodes();
         });
 
+        socket.on('game:over', (data) => {
+            console.log('[WS] game:over', data);
+            location.reload();
+        });
+
     </script>
 </body>
 </html>

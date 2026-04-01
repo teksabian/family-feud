@@ -2164,6 +2164,46 @@
             window.location.href = '/';
         });
 
+        socket.on('game:over', (data) => {
+            console.log('[WS] game:over', data);
+            socket.disconnect();
+            function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+            var html = '<div style="text-align:center; padding:30px 20px; max-width:500px; margin:0 auto;">';
+            html += '<h1 style="color:var(--text-accent); font-size:2.2em; margin-bottom:10px;">Game Over!</h1>';
+            html += '<p style="font-size:1.1em; opacity:0.9; margin-bottom:25px;">Thanks for playing!</p>';
+
+            if (data.winner_team) {
+                html += '<div style="background:rgba(255,215,0,0.15); border:2px solid rgba(255,215,0,0.4); border-radius:12px; padding:20px; margin-bottom:25px;">';
+                html += '<div style="font-size:0.9em; text-transform:uppercase; letter-spacing:1px; opacity:0.7; margin-bottom:8px;">Winner</div>';
+                html += '<div style="font-size:1.6em; font-weight:bold; color:var(--text-accent);">' + esc(data.winner_team) + '</div>';
+                html += '<div style="font-size:1.1em; margin-top:5px;">' + data.winner_score + ' points</div>';
+                html += '</div>';
+            }
+
+            if (data.leaderboard && data.leaderboard.length > 0) {
+                html += '<div style="text-align:left;">';
+                html += '<h3 style="text-align:center; margin-bottom:12px; color:var(--text-accent);">Final Standings</h3>';
+                data.leaderboard.forEach(function(entry) {
+                    var medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : entry.rank + '.';
+                    html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; margin-bottom:4px; background:rgba(255,255,255,0.05); border-radius:8px;">';
+                    html += '<span>' + medal + ' ' + esc(entry.team_name) + '</span>';
+                    html += '<span style="font-weight:bold;">' + entry.total_score + '</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            document.body.innerHTML = html;
+
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setTimeout(function() { confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } }); }, 400);
+                setTimeout(function() { confetti({ particleCount: 100, spread: 120, origin: { y: 0.4 } }); }, 800);
+            }
+        });
+
         socket.on('sleep:toggled', (data) => {
             console.log('[WS] sleep:toggled', data);
             if (data.is_sleeping) {
