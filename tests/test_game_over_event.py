@@ -135,7 +135,7 @@ def test_game_over_leaderboard_payload():
         SELECT r.winner_code, r.round_number, tc.team_name, s.score
         FROM rounds r
         LEFT JOIN team_codes tc ON r.winner_code = tc.code
-        LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id
+        LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
         WHERE r.id = ?
     """, (active_round['id'],)).fetchone()
 
@@ -196,6 +196,29 @@ def test_game_over_leaderboard_payload():
         tests_passed += 1
     else:
         print(f"  ❌ FAIL: Unexpected empty data: {empty_data}")
+        tests_failed += 1
+
+    # --- Test 7: Unscored submission excluded from prev_winner score ---
+    print("\n[TEST 7] prev_winner query excludes unscored submissions (host_submitted = 0)")
+
+    # Add an unscored submission for the winner team — should not affect prev_winner score
+    conn.execute("INSERT INTO submissions (code, round_id, score, host_submitted) VALUES ('AAAA', 1, 99, 0)")
+    conn.commit()
+
+    prev_winner_filtered = conn.execute("""
+        SELECT r.winner_code, r.round_number, tc.team_name, s.score
+        FROM rounds r
+        LEFT JOIN team_codes tc ON r.winner_code = tc.code
+        LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
+        WHERE r.id = ?
+    """, (active_round['id'],)).fetchone()
+
+    if prev_winner_filtered and prev_winner_filtered['score'] == 30:
+        print("  ✅ PASS: prev_winner score = 30 (unscored 99-point submission excluded)")
+        tests_passed += 1
+    else:
+        score = prev_winner_filtered['score'] if prev_winner_filtered else None
+        print(f"  ❌ FAIL: prev_winner score = {score} (expected 30)")
         tests_failed += 1
 
     # --- Summary ---

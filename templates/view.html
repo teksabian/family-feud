@@ -717,7 +717,8 @@
         socket.on('game:over', (data) => {
             console.log('[WS] game:over', data);
             function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-            document.querySelectorAll('.state-panel').forEach(function(el) { el.style.display = 'none'; });
+            document.querySelectorAll('[data-state]').forEach(function(el) { el.style.display = 'none'; });
+            document.getElementById('winner-interstitial').style.display = 'none';
             var container = document.querySelector('.container') || document.body;
             var div = document.createElement('div');
             div.style.cssText = 'text-align:center; padding:40px 20px;';

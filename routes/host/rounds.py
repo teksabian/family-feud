@@ -420,7 +420,7 @@ def start_next_round():
                     SELECT r.winner_code, r.round_number, tc.team_name, s.score
                     FROM rounds r
                     LEFT JOIN team_codes tc ON r.winner_code = tc.code
-                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id
+                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
 
@@ -498,7 +498,7 @@ def start_next_round():
                     SELECT r.winner_code, r.round_number, tc.team_name, s.score
                     FROM rounds r
                     LEFT JOIN team_codes tc ON r.winner_code = tc.code
-                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id
+                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
 
