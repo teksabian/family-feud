@@ -453,8 +453,9 @@
         }
         
         .rounds-list {
-            max-height: 400px;
+            flex: 1;
             overflow-y: auto;
+            min-height: 0;
         }
         
         .round-item {
@@ -747,8 +748,8 @@
             <div class="scan-qr">
                 <div id="scanQR" class="scan-qr-img"></div>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-                <script>new QRCode(document.getElementById("scanQR"), {text: "{{ qr_base_url }}/scan/{{ scan_token }}", width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L});</script>
-                <div class="scan-qr-label">Phone Scanner</div>
+                <script>new QRCode(document.getElementById("scanQR"), {text: "{{ qr_base_url }}/reveal/{{ scan_token }}", width: 100, height: 100, correctLevel: QRCode.CorrectLevel.L});</script>
+                <div class="scan-qr-label">TV Remote</div>
             </div>
             {% endif %}
             {% if tv_board_enabled %}
@@ -1195,8 +1196,9 @@
             </div>
             
             <!-- Right Column: Controls -->
-            <div>
-                
+            <div style="position: relative;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow-y: auto; gap: 20px;">
+
                 <!-- Create Rounds - Combined (only if no rounds exist) -->
                 {% if not rounds %}
                 <div class="card" style="border-color: #ffd700; padding: 15px;">
@@ -1210,7 +1212,7 @@
                     <div style="background: color-mix(in srgb, var(--success) 10%, transparent); padding: 12px; border-radius: 8px; border: 2px solid var(--success);">
                         <h3 style="color: var(--success); margin-bottom: 6px; font-size: 1em;">📄 Upload Answer Sheet</h3>
                         <p style="color: var(--text-muted); margin-bottom: 8px; font-size: 0.85em;">
-                            Upload DOCX or PowerPoint (PPTX/PPTM) to create all 8 rounds at once
+                            Upload DOCX or PowerPoint (PPTX/PPTM) to create all rounds at once
                         </p>
                         <form method="POST" action="{{ url_for('host.upload_answers') }}?v={{ cache_bust }}" enctype="multipart/form-data" id="uploadForm" onsubmit="showUploadSpinner()">
                             <input type="file" name="file" accept=".docx,.pptx,.pptm" required style="margin-bottom: 8px; width: 100%; padding: 6px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text-accent); border: 2px solid var(--success); border-radius: 8px; font-size: 0.85em;">
@@ -1277,22 +1279,13 @@
                         </button>
                     </a>
 
-                    {% if ai_scoring_available %}
-                    <p style="color: var(--text-muted); font-size: 0.85em; margin-top: 15px;">
-                        📷 Scan the QR code in the header to open Photo Scan on your phone (no password needed)
-                    </p>
-                    {% endif %}
-
                 </div>
                 {% endif %}
 
                 <!-- Round Management -->
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 3px solid #ffd700; padding-bottom: 10px;">
+                <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                    <div style="margin-bottom: 20px; border-bottom: 3px solid #ffd700; padding-bottom: 10px;">
                         <h2 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">🎯 All Rounds</h2>
-                        <a href="{{ url_for('host.settings') }}?v={{ cache_bust }}" style="padding: 8px 16px; background: rgba(255,215,0,0.2); color: #ffd700; text-decoration: none; border: 2px solid #ffd700; border-radius: 8px; font-weight: bold; font-size: 0.85em; white-space: nowrap; transition: all 0.3s;">
-                            ⚙️ Settings
-                        </a>
                     </div>
                     
                     <!-- Global Question Toggle (only show when rounds exist) -->
@@ -1435,10 +1428,11 @@
                         }
                     </script>
                 </div>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Footer Area - Logout Button -->
     <div class="container" style="padding: 40px 0; text-align: left;">
         <a href="{{ url_for('auth.host_logout') }}?v={{ cache_bust }}" style="display: inline-block; padding: 10px 20px; background: #dc3545; color: white; text-decoration: none; border-radius: 8px; font-size: 0.9em; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.3s;" onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
