@@ -468,6 +468,57 @@ def start_next_round():
                 conn.commit()
                 logger.info(f"[ROUND] No round {current_num + 1} found - game complete!")
 
+                # Build final leaderboard for game:over event
+                teams = conn.execute("""
+                    SELECT tc.team_name, tc.code,
+                           COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score
+                    FROM team_codes tc
+                    LEFT JOIN submissions s ON tc.code = s.code
+                    WHERE tc.used = 1 AND tc.team_name IS NOT NULL
+                    GROUP BY tc.code
+                    ORDER BY total_score DESC, tc.team_name ASC
+                """).fetchall()
+
+                leaderboard = []
+                for i, row in enumerate(teams):
+                    leaderboard.append({
+                        'team_name': row['team_name'],
+                        'total_score': row['total_score'],
+                        'rank': i + 1,
+                    })
+
+                game_over_data = {
+                    'leaderboard': leaderboard,
+                    'winner_team': leaderboard[0]['team_name'] if leaderboard else None,
+                    'winner_score': leaderboard[0]['total_score'] if leaderboard else 0,
+                }
+
+                # Include last round's winner info
+                prev_winner = conn.execute("""
+                    SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                    FROM rounds r
+                    LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                    LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id
+                    WHERE r.id = ?
+                """, (active_round['id'],)).fetchone()
+
+                if prev_winner and prev_winner['winner_code']:
+                    game_over_data['previous_winner_team'] = prev_winner['team_name']
+                    game_over_data['previous_winner_score'] = prev_winner['score']
+                    game_over_data['previous_round_number'] = prev_winner['round_number']
+                    game_over_data['previous_question'] = active_round['question']
+                    prev_answers = []
+                    for i in range(1, 7):
+                        ans = active_round[f'answer{i}']
+                        if ans:
+                            prev_answers.append(ans)
+                    game_over_data['previous_answers'] = prev_answers
+
+                socketio.emit('game:over', game_over_data, to='teams')
+                socketio.emit('game:over', game_over_data, to='hosts')
+                socketio.emit('game:over', game_over_data, to='tv')
+                logger.info(f"[ROUND] Emitted game:over event with {len(leaderboard)} teams")
+
                 # Auto-save AI-generated surveys to history
                 if get_setting('rounds_source') == 'ai':
                     try:

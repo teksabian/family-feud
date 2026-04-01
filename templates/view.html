@@ -713,6 +713,18 @@
             console.log('[WS] game:reset');
             window.location.href = '/';
         });
+
+        socket.on('game:over', (data) => {
+            console.log('[WS] game:over', data);
+            document.querySelectorAll('.state-panel').forEach(function(el) { el.style.display = 'none'; });
+            var container = document.querySelector('.container') || document.body;
+            var div = document.createElement('div');
+            div.style.cssText = 'text-align:center; padding:40px 20px;';
+            div.innerHTML = '<h1 style="font-size:2em;">Game Over!</h1>' +
+                (data.winner_team ? '<h2>Winner: ' + data.winner_team.replace(/</g, '&lt;') + ' (' + data.winner_score + ' pts)</h2>' : '') +
+                '<p style="margin-top:15px; opacity:0.8;">Thanks for playing!</p>';
+            container.appendChild(div);
+        });
     </script>
 </body>
 </html>
