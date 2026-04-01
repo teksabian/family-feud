@@ -2166,6 +2166,8 @@
 
         socket.on('game:over', (data) => {
             console.log('[WS] game:over', data);
+            socket.disconnect();
+            function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
             var html = '<div style="text-align:center; padding:30px 20px; max-width:500px; margin:0 auto;">';
             html += '<h1 style="color:var(--text-accent); font-size:2.2em; margin-bottom:10px;">Game Over!</h1>';
@@ -2174,7 +2176,7 @@
             if (data.winner_team) {
                 html += '<div style="background:rgba(255,215,0,0.15); border:2px solid rgba(255,215,0,0.4); border-radius:12px; padding:20px; margin-bottom:25px;">';
                 html += '<div style="font-size:0.9em; text-transform:uppercase; letter-spacing:1px; opacity:0.7; margin-bottom:8px;">Winner</div>';
-                html += '<div style="font-size:1.6em; font-weight:bold; color:var(--text-accent);">' + data.winner_team.replace(/</g, '&lt;') + '</div>';
+                html += '<div style="font-size:1.6em; font-weight:bold; color:var(--text-accent);">' + esc(data.winner_team) + '</div>';
                 html += '<div style="font-size:1.1em; margin-top:5px;">' + data.winner_score + ' points</div>';
                 html += '</div>';
             }
@@ -2185,7 +2187,7 @@
                 data.leaderboard.forEach(function(entry) {
                     var medal = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : entry.rank + '.';
                     html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; margin-bottom:4px; background:rgba(255,255,255,0.05); border-radius:8px;">';
-                    html += '<span>' + medal + ' ' + entry.team_name.replace(/</g, '&lt;') + '</span>';
+                    html += '<span>' + medal + ' ' + esc(entry.team_name) + '</span>';
                     html += '<span style="font-weight:bold;">' + entry.total_score + '</span>';
                     html += '</div>';
                 });
