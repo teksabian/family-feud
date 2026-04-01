@@ -2009,9 +2009,15 @@
                         aiThinkingSubmissions.delete(data.submission_id);
 
                         // Build AI notes
-                        buildAINotes(data.submission_id, data.ai_reasoning || []);
+                        if (typeof buildAINotes === 'function') {
+                            buildAINotes(data.submission_id, data.ai_reasoning || []);
+                        }
                         const toggleBtn = document.getElementById(`toggleNotes-${data.submission_id}`);
                         if (toggleBtn) toggleBtn.style.display = 'inline-block';
+                    }
+
+                    if (typeof showToast === 'function') {
+                        showToast(`AI scored ${data.code}: ${data.score} pts`, 'success', 3000);
                     }
                 } else if (isCurrentPanel && unsavedChanges) {
                     if (typeof showToast === 'function') {
@@ -2020,10 +2026,6 @@
                 }
 
                 updateNavBar();
-
-                if (typeof showToast === 'function') {
-                    showToast(`AI scored ${data.code}: ${data.score} pts`, 'success', 3000);
-                }
             }
         });
     </script>
