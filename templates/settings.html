@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Pub Family Feud</title>
+    <title>Settings - {{ 'The Country Says' if game_mode == 'countrysays' else 'Survey Says' }}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -447,6 +447,44 @@
             </div>
         </div>
         
+        <!-- Game Mode -->
+        <div style="background: var(--bg-color); border: 2px solid var(--accent); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: var(--text-accent); margin-bottom: 15px;">🎮 Game Mode</h2>
+            <form method="POST" action="{{ url_for('host.set_game_mode') }}">
+                <div style="margin-bottom: 15px;">
+                    <label style="color: var(--text-muted); font-size: 0.9em;">Active Game Mode</label>
+                    <select name="game_mode" id="gameModeSettings" onchange="toggleCSSettings()" style="width: 100%; padding: 10px; border: 2px solid var(--card-border); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 5px;">
+                        <option value="surveysays" {{ 'selected' if game_mode != 'countrysays' }}>Survey Says</option>
+                        <option value="countrysays" {{ 'selected' if game_mode == 'countrysays' }}>The Country Says</option>
+                    </select>
+                </div>
+
+                <div id="csSettings" style="display: {{ 'block' if game_mode == 'countrysays' else 'none' }}; border-top: 1px solid var(--card-border); padding-top: 15px; margin-top: 10px;">
+                    <h3 style="color: var(--text-accent); margin-bottom: 10px;">⏱️ Country Says Scoring</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.85em;">Timer Duration (seconds)</label>
+                            <input type="number" name="cs_timer_seconds" value="{{ cs_timer_seconds }}" min="10" max="600" style="width: 100%; padding: 8px; border: 2px solid var(--card-border); border-radius: 6px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 3px;">
+                        </div>
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.85em;">Points Per Correct Answer</label>
+                            <input type="number" name="cs_points_per_answer" value="{{ cs_points_per_answer }}" min="1" max="1000" style="width: 100%; padding: 8px; border: 2px solid var(--card-border); border-radius: 6px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 3px;">
+                        </div>
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.85em;">Max Speed Bonus</label>
+                            <input type="number" name="cs_max_speed_bonus" value="{{ cs_max_speed_bonus }}" min="0" max="1000" style="width: 100%; padding: 8px; border: 2px solid var(--card-border); border-radius: 6px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 3px;">
+                        </div>
+                        <div>
+                            <label style="color: var(--text-muted); font-size: 0.85em;">Perfect Round Bonus (7/7)</label>
+                            <input type="number" name="cs_perfect_bonus" value="{{ cs_perfect_bonus }}" min="0" max="2000" style="width: 100%; padding: 8px; border: 2px solid var(--card-border); border-radius: 6px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 3px;">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" style="margin-top: 15px; padding: 10px 25px; background: var(--btn-bg); color: var(--btn-text); border: none; border-radius: 8px; font-size: 1em; cursor: pointer; font-family: var(--font);">Save Game Mode</button>
+            </form>
+        </div>
+
         <!-- Game Controls -->
         <div class="card">
             <h2>🎮 Game Controls</h2>
@@ -1082,5 +1120,12 @@
     </script>
     
     {% include '_toast.html' %}
+<script>
+function toggleCSSettings() {
+    var select = document.getElementById('gameModeSettings');
+    var csSettings = document.getElementById('csSettings');
+    csSettings.style.display = select.value === 'countrysays' ? 'block' : 'none';
+}
+</script>
 </body>
 </html>

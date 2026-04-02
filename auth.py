@@ -1,5 +1,5 @@
 """
-Authentication, session management, and request logging for Family Feud.
+Authentication, session management, and request logging for Survey Says.
 
 Owns: host_required/team_session_valid decorators, host login/logout routes,
 session configuration, and request logging middleware.
@@ -12,6 +12,7 @@ from config import (
     logger, SECRET_KEY, STARTUP_ID, reset_state,
     HOST_PASSWORD, AI_SCORING_ENABLED, QUIET_PATHS,
 )
+from database import get_game_mode, set_setting
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -91,6 +92,11 @@ def host_login():
         if password == HOST_PASSWORD:
             session['host_authenticated'] = True
             logger.info("Host authenticated successfully")
+            # Save game mode selection from login form
+            game_mode = request.form.get('game_mode', '').strip()
+            if game_mode in ('surveysays', 'countrysays'):
+                set_setting('game_mode', game_mode, 'Active game mode: surveysays or countrysays')
+                logger.info(f"[HOST] Game mode set to '{game_mode}' on login")
             # On mobile, go straight to photo scan (if AI enabled)
             if AI_SCORING_ENABLED:
                 ua = request.headers.get('User-Agent', '').lower()

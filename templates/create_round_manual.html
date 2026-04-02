@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create All Rounds Manually - Family Feud</title>
+    <title>Create All Rounds Manually - Survey Says</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -480,6 +480,7 @@
             </div>
         </details>
         
+        {% if game_mode != 'countrysays' %}
         <div class="game-setup">
             <label>Game Setup</label>
             <div class="game-setup-row">
@@ -574,8 +575,6 @@
 
             <div id="rounds-container"></div>
         </form>
-        
-    </div>
 
     <script>
         var SURVEYS = {{ prebuilt_surveys|tojson }};
@@ -1071,5 +1070,41 @@
             });
         }
     </script>
+    {% else %}
+        <!-- COUNTRY SAYS: Prebuilt Packs -->
+        <div style="background: var(--bg-color); border: 2px solid var(--accent); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: var(--text-accent); margin-bottom: 15px;">📦 Load Prebuilt Pack</h2>
+            <p style="color: var(--text-muted); margin-bottom: 15px;">Select a ready-made Country Says pack with 8 rounds.</p>
+            <form method="POST" action="{{ url_for('host.load_countrysays_pack') }}">
+                <select name="pack_key" style="width: 100%; padding: 10px; border: 2px solid var(--card-border); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-bottom: 15px;">
+                    {% for key, pack in prebuilt_countrysays.items() %}
+                    <option value="{{ key }}">{{ pack.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" style="width: 100%; padding: 12px; background: var(--btn-blue-bg); color: var(--btn-blue-text); border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer;">Load Pack</button>
+            </form>
+        </div>
+
+        <!-- COUNTRY SAYS: Manual Round Creation -->
+        <div style="background: var(--bg-color); border: 2px solid var(--accent); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: var(--text-accent); margin-bottom: 15px;">✏️ Create Single Round</h2>
+            <form method="POST" action="{{ url_for('host.create_round') }}">
+                <div style="margin-bottom: 15px;">
+                    <label style="color: var(--text-muted); font-size: 0.9em;">Prompt</label>
+                    <input type="text" name="question" placeholder="The country says... something you always lose is ____" required
+                           style="width: 100%; padding: 12px; border: 2px solid var(--card-border); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 5px;">
+                </div>
+                {% for i in range(1, 8) %}
+                <div style="margin-bottom: 10px;">
+                    <label style="color: var(--text-muted); font-size: 0.85em;">Answer {{ i }}</label>
+                    <input type="text" name="answer{{ i }}" placeholder="Answer {{ i }}" required
+                           style="width: 100%; padding: 10px; border: 2px solid var(--card-border); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1em; margin-top: 3px;">
+                </div>
+                {% endfor %}
+                <button type="submit" style="width: 100%; padding: 12px; background: var(--btn-bg); color: var(--btn-text); border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-top: 10px;">Create Round</button>
+            </form>
+        </div>
+    {% endif %}
+    </div>
 </body>
 </html>

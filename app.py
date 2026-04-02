@@ -15,6 +15,7 @@ from routes.tv import tv_bp
 from database import (
     db_connect,
     ensure_fixed_codes,
+    get_game_mode,
     get_setting,
     init_db,
     nuke_all_data,
@@ -47,6 +48,10 @@ def inject_theme():
     theme = THEMES.get(key, THEMES['classic'])
     safe_theme = {k: Markup(v) if isinstance(v, str) else v for k, v in theme.items()}
     return dict(theme=safe_theme, theme_key=key, themes=THEMES)
+
+@app.context_processor
+def inject_game_mode():
+    return dict(game_mode=get_game_mode())
 
 @app.context_processor
 def inject_tv_bar_state():
@@ -85,7 +90,7 @@ if __name__ == '__main__':
     local_ip = socket.gethostbyname(hostname)
 
     print("\n" + "="*60)
-    print("🎮 FAMILY FEUD - PRODUCTION SERVER")
+    print("🎮 SURVEY SAYS - PRODUCTION SERVER")
     print("="*60)
     print(f"\n📱 Team Join: http://{local_ip}:5000/join")
     print(f"🖥️  Host Dashboard: http://localhost:5000/host")

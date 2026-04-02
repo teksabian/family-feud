@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Play - Family Feud</title>
+    <title>Play - Survey Says</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -1119,12 +1119,13 @@
     
     <div class="container">
         <div class="card">
+            {% if game_mode != 'countrysays' %}
             <div class="brand-logo-submitted">
                 <img src="{{ url_for('static', filename='logo.png') }}?v={{ cache_bust }}" alt="Game Night Guild">
-                <div class="game-title-submitted">Family Feud</div>
+                <div class="game-title-submitted">Survey Says</div>
                 <div class="round-complete-text">Round {{ round_num }}</div>
             </div>
-            
+
             <p style="color: var(--success); font-size: 1em; text-align: center; margin: 0;">✅ Submitted</p>
 
             {% if mobile_experience != 'basic' %}
@@ -1180,6 +1181,23 @@
                 <p style="font-size: 0.85em; opacity: 0.8; margin-top: 10px;">This page will refresh automatically</p>
             </div>
             {% endif %}
+            {% endif %}
+            {% else %}
+            <!-- COUNTRY SAYS: Submitted state -->
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 2em; margin-bottom: 10px;">✅</div>
+                <div style="font-size: 1.3em; font-weight: bold; color: var(--text-accent); margin-bottom: 15px;">Submitted!</div>
+                <div style="color: var(--text-muted); margin-bottom: 10px;">Your answers:</div>
+                {% for i in range(1, 8) %}
+                    {% set ans = submission['answer' ~ i] %}
+                    {% if ans %}
+                    <div style="padding: 6px 12px; margin: 4px auto; max-width: 300px; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; color: var(--text);">{{ ans }}</div>
+                    {% else %}
+                    <div style="padding: 6px 12px; margin: 4px auto; max-width: 300px; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; color: var(--text-muted); font-style: italic;">—</div>
+                    {% endif %}
+                {% endfor %}
+                <div style="font-size: 0.9em; color: var(--text-muted); margin-top: 15px;">Waiting for host to reveal answers...</div>
+            </div>
             {% endif %}
 
             <!-- Winner Interstitial (shown via JS on round transition) -->
@@ -1525,6 +1543,7 @@
     
     <div class="container">
         <div class="card">
+            {% if game_mode != 'countrysays' %}
             <!-- Collapsible Instructions -->
             <div class="instructions-toggle" onclick="toggleInstructions()">
                 <div class="instructions-header">
@@ -1543,7 +1562,7 @@
                     </ul>
                 </div>
             </div>
-            
+
             <!-- Answer Progress -->
             <div class="answer-progress" id="answerProgress">
                 <span id="progressText">0 of {{ num_answers }} answers</span>
@@ -1554,38 +1573,63 @@
 
             <form id="answerForm" method="POST" action="{{ url_for('team.submit_answers') }}?v={{ cache_bust }}" onsubmit="return validateAnswers(event)">
                 <input type="hidden" name="round_id" value="{{ round_id }}">
-                
+
                 <!-- Answer Fields -->
                 {% for i in range(1, num_answers + 1) %}
                 <div class="answer-group">
                     <div class="answer-label">
                         Answer #{{ i }}
                     </div>
-                    <input type="text" 
-                           name="answer{{ i }}" 
+                    <input type="text"
+                           name="answer{{ i }}"
                            placeholder="Your answer #{{ i }}..."
                            required
                            autocomplete="off">
                 </div>
                 {% endfor %}
-                
+
                 <!-- Tiebreaker -->
                 <div class="tiebreaker-box">
                     <h3>🎯 Tiebreaker</h3>
-                    <input type="number" 
-                           name="tiebreaker" 
+                    <input type="number"
+                           name="tiebreaker"
                            placeholder="0-100"
                            min="0"
                            max="100"
                            required>
                     <p>How many out of 100 people gave the #1 answer?</p>
                 </div>
-                
+
                 <!-- Submit Button -->
                 <button type="submit">
                     Submit Answers
                 </button>
             </form>
+            {% else %}
+            <!-- COUNTRY SAYS: Timer + 7 inputs + submit -->
+            <div id="csTimerContainer" style="position: relative; margin-bottom: 15px;">
+                <div id="csTimerBar" style="height: 8px; background: var(--success); border-radius: 4px; transition: width 1s linear;"></div>
+                <div id="csTimerText" style="text-align: center; font-size: 1.5em; font-weight: bold; color: var(--text-accent); margin-top: 5px;">--:--</div>
+            </div>
+
+            <form method="POST" action="{{ url_for('team.submit_answers') }}" id="csForm">
+                <input type="hidden" name="round_id" value="{{ round_id }}">
+                <input type="hidden" name="tiebreaker" value="0">
+                {% for i in range(1, 8) %}
+                <div style="margin-bottom: 10px;">
+                    <label style="color: var(--text-muted); font-size: 0.85em;">Answer {{ i }}</label>
+                    <input type="text" name="answer{{ i }}" id="csAnswer{{ i }}"
+                           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                           style="width: 100%; padding: 12px; border: 2px solid var(--card-border); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1.1em;"
+                           oninput="updateCSProgress()">
+                </div>
+                {% endfor %}
+                <div id="csProgress" style="text-align: center; color: var(--text-muted); margin-bottom: 10px;">0 of 7 answers</div>
+                <button type="submit" id="csSubmitBtn" style="width: 100%; padding: 15px; background: var(--btn-bg); color: var(--btn-text); border: none; border-radius: 10px; font-size: 1.2em; font-weight: bold; cursor: pointer;">
+                    Submit Answers
+                </button>
+            </form>
+            {% endif %}
         </div>
     </div>
     
@@ -2345,5 +2389,56 @@
             if (hostFont) loadedFonts.add(hostFont);
         })();
     </script>
+
+{% if game_mode == 'countrysays' and not already_submitted %}
+<script>
+(function() {
+    var timerBar = document.getElementById('csTimerBar');
+    var timerText = document.getElementById('csTimerText');
+    var csForm = document.getElementById('csForm');
+    if (!timerBar || !csForm) return;
+
+    // Listen for round:started to get timer_seconds
+    var timerSeconds = {{ timer_seconds | default(90) }};
+    var startTime = Date.now();
+    var endTime = startTime + (timerSeconds * 1000);
+
+    function updateTimer() {
+        var now = Date.now();
+        var remaining = Math.max(0, (endTime - now) / 1000);
+        var pct = (remaining / timerSeconds) * 100;
+
+        timerBar.style.width = pct + '%';
+        if (remaining < 15) {
+            timerBar.style.background = '#e74c3c';
+        } else if (remaining < 30) {
+            timerBar.style.background = '#f39c12';
+        }
+
+        var mins = Math.floor(remaining / 60);
+        var secs = Math.floor(remaining % 60);
+        timerText.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+
+        if (remaining <= 0) {
+            timerText.textContent = '0:00';
+            // Auto-submit
+            csForm.submit();
+            return;
+        }
+        requestAnimationFrame(updateTimer);
+    }
+    updateTimer();
+})();
+
+function updateCSProgress() {
+    var filled = 0;
+    for (var i = 1; i <= 7; i++) {
+        if (document.getElementById('csAnswer' + i).value.trim()) filled++;
+    }
+    document.getElementById('csProgress').textContent = filled + ' of 7 answers';
+}
+</script>
+{% endif %}
+
 </body>
 </html>

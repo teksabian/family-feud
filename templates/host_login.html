@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Host Login - Family Feud</title>
+    <title>Host Login - {{ 'The Country Says' if game_mode == 'countrysays' else 'Survey Says' }}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="login-container">
-        <div class="logo-title">Family Feud</div>
+        <div class="logo-title" id="logoTitle">{{ 'The Country Says' if game_mode == 'countrysays' else 'Survey Says' }}</div>
         <p class="presented-by">presented by</p>
 
         <div class="logo">
@@ -180,6 +180,13 @@
         <form method="POST">
             <div class="form-group">
                 <label for="password">Host Password:</label>
+        <div class="input-group" style="margin-bottom: 15px;">
+            <label for="game_mode" style="display: block; font-size: 0.9em; color: var(--text-muted); margin-bottom: 5px;">Game Mode</label>
+            <select name="game_mode" id="gameModeSelect" onchange="updateTitle()" style="width: 100%; padding: 12px 15px; border: 2px solid var(--accent); border-radius: 8px; background: var(--bg-color); color: var(--text); font-size: 1em; font-family: var(--font);">
+                <option value="surveysays" {{ 'selected' if game_mode != 'countrysays' }}>Survey Says</option>
+                <option value="countrysays" {{ 'selected' if game_mode == 'countrysays' }}>The Country Says</option>
+            </select>
+        </div>
                 <input type="password"
                        id="password"
                        name="password"
@@ -196,5 +203,16 @@
         // Auto-focus on password input
         document.getElementById('password').focus();
     </script>
+<script>
+function updateTitle() {
+    var select = document.getElementById('gameModeSelect');
+    var title = document.getElementById('logoTitle');
+    if (select.value === 'countrysays') {
+        title.textContent = 'The Country Says';
+    } else {
+        title.textContent = 'Survey Says';
+    }
+}
+</script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Feud — TV Board</title>
+    <title>Survey Says — TV Board</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
     <style>
         /* ── Reset & Full-screen ────────────────────────────────── */
@@ -255,6 +255,7 @@
 
 <!-- Game board screen -->
 <div id="screen-board" class="screen screen-board">
+    {% if game_mode != 'countrysays' %}
     <div class="board-wrapper">
         <div class="speaker-panel left"></div>
         <div class="speaker-panel right"></div>
@@ -265,6 +266,20 @@
             <div class="answer-grid" id="answerGrid"></div>
         </div>
     </div>
+    {% else %}
+    <!-- COUNTRY SAYS BOARD -->
+    <div class="cs-board" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 4vh 6vw; background: linear-gradient(to top, #0a0a2e, #0d1545);">
+        <div class="cs-prompt" style="font-size: clamp(1.5rem, 3vw, 3.5rem); font-weight: bold; text-align: center; color: #fff; margin-bottom: 4vh; max-width: 80vw; text-shadow: 0 2px 12px rgba(0,0,0,0.5);" id="csPrompt"></div>
+        <div class="cs-answers" style="display: flex; flex-direction: column; gap: 1.5vh; width: 70vw; max-width: 800px;" id="csAnswerSlots">
+            {% for i in range(1, 8) %}
+            <div class="cs-slot" id="csSlot{{ i }}" data-num="{{ i }}" style="display: flex; align-items: center; padding: 1.5vh 2vw; background: linear-gradient(135deg, #1a237e, #283593); border: 2px solid #3949ab; border-radius: 12px; cursor: pointer; transition: all 0.4s ease;">
+                <span class="cs-num" style="font-size: clamp(1rem, 2vw, 2rem); font-weight: bold; color: rgba(255,255,255,0.5); margin-right: 2vw; min-width: 3vw;">{{ i }}</span>
+                <span class="cs-clue" id="csClue{{ i }}" style="font-size: clamp(1.2rem, 2.5vw, 2.5rem); font-weight: bold; color: #fff; letter-spacing: 0.3em; text-transform: uppercase;"></span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Halftime screen -->
@@ -425,6 +440,33 @@
 
         updateQuestion();
         buildBoard();
+
+        // Country Says: populate prompt and initialize clue slots
+        var csPrompt = document.getElementById('csPrompt');
+        if (csPrompt && roundData && roundData.question) {
+            csPrompt.textContent = roundData.question;
+        }
+        // Initialize Country Says clue slots with blanks
+        for (var i = 1; i <= 7; i++) {
+            var clue = document.getElementById('csClue' + i);
+            if (clue && !clue.textContent) clue.textContent = '_ _ _ _ _';
+        }
+        // Re-apply already-revealed answers to Country Says slots
+        if (roundData && roundData.answers) {
+            revealedSet.forEach(function(num) {
+                var csSlot = document.getElementById('csSlot' + num);
+                if (csSlot) {
+                    csSlot.style.background = 'linear-gradient(135deg, #1b5e20, #2e7d32)';
+                    csSlot.style.borderColor = '#4caf50';
+                    var answer = roundData.answers.find(function(a) { return a.num === num; });
+                    if (answer) {
+                        var clueEl = document.getElementById('csClue' + num);
+                        if (clueEl) clueEl.textContent = answer.text;
+                    }
+                }
+            });
+        }
+
         showScreen(state.screen || 'welcome');
     }
 
@@ -467,12 +509,21 @@
         if (data && data.answer_num) {
             const num = data.answer_num;
             revealedSet.add(num);
-            const tile = answerGrid.querySelector('.tile[data-num="' + num + '"]');
+            const tile = answerGrid ? answerGrid.querySelector('.tile[data-num="' + num + '"]') : null;
             if (tile && data.text != null) {
                 tile.querySelector('.tile-answer').textContent = data.text;
                 tile.querySelector('.tile-count').textContent = data.count;
             }
             revealTile(num, true);
+
+            // Country Says slot reveal
+            var csSlot = document.getElementById('csSlot' + data.answer_num);
+            if (csSlot) {
+                csSlot.style.background = 'linear-gradient(135deg, #1b5e20, #2e7d32)';
+                csSlot.style.borderColor = '#4caf50';
+                var clue = document.getElementById('csClue' + data.answer_num);
+                if (clue) clue.textContent = data.text;
+            }
         }
     });
 

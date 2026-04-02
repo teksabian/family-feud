@@ -1,5 +1,5 @@
 """
-Host dashboard routes for Family Feud.
+Host dashboard routes for Survey Says.
 
 Owns: Host dashboard, round management, code management, settings,
 broadcast, reset, training data, and all related host-facing endpoints.
@@ -57,6 +57,17 @@ def build_rounds_config(num_rounds=DEFAULT_NUM_ROUNDS, default_answers=DEFAULT_A
             answers = max(MIN_ANSWERS, min(MAX_ANSWERS, int(per_round_answers[i])))
         config.append({"round": i, "answers": answers})
     return config
+
+def get_rounds_config():
+    """Return rounds config for the active game mode."""
+    from database import get_game_mode, get_setting
+    from config import COUNTRYSAYS_ROUNDS_CONFIG
+    mode = get_game_mode()
+    if mode == 'countrysays':
+        num = int(get_setting('cs_num_rounds', '8'))
+        return COUNTRYSAYS_ROUNDS_CONFIG[:num]
+    return ROUNDS_CONFIG
+
 
 # Import sub-modules to register their routes on host_bp
 from routes.host import dashboard, rounds, codes, broadcast, training

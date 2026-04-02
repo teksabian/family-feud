@@ -1,5 +1,5 @@
 """
-Scoring and photo scan routes for Family Feud.
+Scoring and photo scan routes for Survey Says.
 
 Owns: Scoring queue, manual/AI scoring, score editing, undo/revert,
 scored teams list, manual entry, and photo scan (capture + review).
@@ -64,6 +64,89 @@ def emit_leaderboard_update():
             }, to='teams')
     except Exception as e:
         logger.error(f"[LEADERBOARD] Error emitting update: {e}")
+
+
+def _score_countrysays(submission, round_info):
+    """Score a Country Says submission instantly. No AI needed."""
+    from database import get_setting
+
+    points_per = int(get_setting('cs_points_per_answer', '100'))
+    max_speed = int(get_setting('cs_max_speed_bonus', '200'))
+    perfect = int(get_setting('cs_perfect_bonus', '300'))
+    timer_secs = int(get_setting('cs_timer_seconds', '90'))
+
+    correct_count = 0
+    checked = []
+
+    for i in range(1, 8):
+        team_answer = (submission[f'answer{i}'] or '').strip().lower()
+        correct_answer = (round_info[f'answer{i}'] or '').strip().lower()
+
+        if not team_answer or not correct_answer:
+            continue
+
+        # Exact match (case-insensitive)
+        if team_answer == correct_answer:
+            correct_count += 1
+            checked.append(i)
+            continue
+
+        # Fuzzy match: allow minor typos
+        if len(team_answer) > 2 and len(correct_answer) > 2:
+            ratio = SequenceMatcher(None, team_answer, correct_answer).ratio()
+            if ratio >= 0.85:
+                correct_count += 1
+                checked.append(i)
+
+    # Base score
+    base = correct_count * points_per
+
+    # Speed bonus from timestamps
+    speed_bonus = 0
+    if submission['submitted_at'] and round_info['activated_at']:
+        from datetime import datetime
+        try:
+            submitted = datetime.strptime(submission['submitted_at'], '%Y-%m-%d %H:%M:%S')
+            activated = datetime.strptime(round_info['activated_at'], '%Y-%m-%d %H:%M:%S')
+            elapsed = (submitted - activated).total_seconds()
+            remaining = max(0, timer_secs - elapsed)
+            speed_bonus = int((remaining / timer_secs) * max_speed)
+        except (ValueError, TypeError):
+            speed_bonus = 0
+
+    # Perfect bonus
+    perfect_bonus = perfect if correct_count == 7 else 0
+
+    total = base + speed_bonus + perfect_bonus
+    return total, checked, speed_bonus
+
+
+def auto_score_countrysays_round(round_id):
+    """Auto-score all submissions for a Country Says round. Called when round closes."""
+    from database import db_connect
+
+    with db_connect() as conn:
+        round_info = conn.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+        if not round_info:
+            return
+
+        submissions = conn.execute(
+            "SELECT * FROM submissions WHERE round_id = ? AND host_submitted = 0",
+            (round_id,)
+        ).fetchall()
+
+        for sub in submissions:
+            total, checked, speed_bonus = _score_countrysays(dict(sub), dict(round_info))
+            conn.execute("""
+                UPDATE submissions
+                SET score = ?, scored = 1, host_submitted = 1, scored_at = CURRENT_TIMESTAMP,
+                    checked_answers = ?, speed_bonus = ?, previous_score = score
+                WHERE id = ?
+            """, (total, ','.join(str(c) for c in checked), speed_bonus, sub['id']))
+
+        conn.commit()
+
+    emit_leaderboard_update()
 
 
 def run_ai_scoring_for_submission(submission_id, auto_accept=False):

@@ -1,5 +1,5 @@
 """
-Database layer for Family Feud.
+Database layer for Survey Says.
 
 Owns all SQLite schema, migrations, connection management, and settings helpers.
 Pure database operations — no Flask dependency.
@@ -242,6 +242,27 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: host_submitted column added (backfilled from scored)")
 
+        # Migration: Add answer7, answer7_count, activated_at to rounds (Country Says)
+        try:
+            conn.execute("SELECT answer7 FROM rounds LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding Country Says columns to rounds table...")
+            conn.execute("ALTER TABLE rounds ADD COLUMN answer7 TEXT")
+            conn.execute("ALTER TABLE rounds ADD COLUMN answer7_count INTEGER")
+            conn.execute("ALTER TABLE rounds ADD COLUMN activated_at TIMESTAMP DEFAULT NULL")
+            conn.commit()
+            logger.info("Migration complete: answer7, answer7_count, activated_at columns added to rounds")
+
+        # Migration: Add answer7, speed_bonus to submissions (Country Says)
+        try:
+            conn.execute("SELECT answer7 FROM submissions LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding Country Says columns to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN answer7 TEXT")
+            conn.execute("ALTER TABLE submissions ADD COLUMN speed_bonus INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Migration complete: answer7, speed_bonus columns added to submissions")
+
         # Migration: Split ai_model into ai_ocr_model and ai_scoring_model
         existing_ai_model = conn.execute(
             "SELECT value FROM settings WHERE key = 'ai_model'"
@@ -276,6 +297,11 @@ def init_db():
             ('ai_generation_model', '', 'AI model for round generation'),
             ('color_theme', 'gamenight', 'UI color theme'),
             ('tv_board_enabled', 'true', 'Enable TV board display feature'),
+            ('game_mode', 'surveysays', 'Active game mode: surveysays or countrysays'),
+            ('cs_timer_seconds', '90', 'Country Says: round timer in seconds'),
+            ('cs_points_per_answer', '100', 'Country Says: points per correct answer'),
+            ('cs_max_speed_bonus', '200', 'Country Says: maximum speed bonus points'),
+            ('cs_perfect_bonus', '300', 'Country Says: bonus for all 7 correct'),
         ]
 
         for key, value, description in default_settings:
@@ -358,3 +384,8 @@ def set_setting(key, value, description=''):
     except Exception as e:
         logger.error(f"[SETTINGS] Failed to set setting '{key}': {e}")
         return False
+
+
+def get_game_mode():
+    """Return the active game mode: 'surveysays' or 'countrysays'."""
+    return get_setting('game_mode', 'surveysays')

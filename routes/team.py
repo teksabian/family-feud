@@ -1,5 +1,5 @@
 """
-Team-facing routes for Family Feud.
+Team-facing routes for Survey Says.
 
 Owns: join flow (code validation, team name submission, reconnection),
 play page, answer submission, view page, and terms page.
@@ -11,7 +11,7 @@ from flask import Blueprint, request, render_template, redirect, url_for, sessio
 
 from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED
 from auth import team_session_valid
-from database import db_connect, get_setting
+from database import db_connect, get_setting, get_game_mode
 from extensions import socketio
 from routes.scoring import emit_leaderboard_update
 
@@ -320,6 +320,9 @@ def team_play():
                                  mobile_experience=mobile_experience)
 
     logger.debug(f"[TEAM] team_play() - round {active_round['round_number']}, showing answer form ({active_round['num_answers']} answers)")
+    extra = {}
+    if get_game_mode() == 'countrysays':
+        extra['timer_seconds'] = int(get_setting('cs_timer_seconds', '90'))
     return render_template('play.html',
                          team_name=team_name,
                          code=code,
@@ -328,7 +331,8 @@ def team_play():
                          num_answers=active_round['num_answers'],
                          round_id=active_round['id'],
                          submissions_closed=active_round['submissions_closed'],
-                         mobile_experience=mobile_experience)
+                         mobile_experience=mobile_experience,
+                         **extra)
 
 
 @team_bp.route('/play/submit', methods=['POST'])

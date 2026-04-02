@@ -142,6 +142,12 @@ def settings():
     # Count corrections in current session
     corrections_count = len(load_corrections_history())
 
+    # Country Says settings
+    cs_timer_seconds = int(get_setting('cs_timer_seconds', '90'))
+    cs_points_per_answer = int(get_setting('cs_points_per_answer', '100'))
+    cs_max_speed_bonus = int(get_setting('cs_max_speed_bonus', '200'))
+    cs_perfect_bonus = int(get_setting('cs_perfect_bonus', '300'))
+
     return render_template('settings.html',
                          qr_base_url=current_qr_url,
                          allow_team_registration=allow_team_registration,
@@ -156,7 +162,11 @@ def settings():
                          current_scoring_model=get_current_scoring_model(),
                          extended_thinking_enabled=extended_thinking_enabled,
                          thinking_budget_tokens=thinking_budget_tokens,
-                         tv_board_enabled=tv_board_enabled)
+                         tv_board_enabled=tv_board_enabled,
+                         cs_timer_seconds=cs_timer_seconds,
+                         cs_points_per_answer=cs_points_per_answer,
+                         cs_max_speed_bonus=cs_max_speed_bonus,
+                         cs_perfect_bonus=cs_perfect_bonus)
 
 
 @host_bp.route('/host/toggle-setting', methods=['POST'])
@@ -286,6 +296,34 @@ def set_thinking_budget():
 
     logger.info(f"[SETTINGS] Thinking budget changed to: {budget}")
     flash(f'Thinking budget set to {budget:,} tokens', 'success')
+
+    return redirect(url_for('.settings'))
+
+
+@host_bp.route('/host/set-game-mode', methods=['POST'])
+@host_required
+def set_game_mode():
+    """Set the active game mode and Country Says scoring settings."""
+    game_mode = request.form.get('game_mode', '').strip()
+    if game_mode in ('surveysays', 'countrysays'):
+        set_setting('game_mode', game_mode, 'Active game mode: surveysays or countrysays')
+        logger.info(f"[SETTINGS] Game mode changed to: {game_mode}")
+        flash(f'Game mode set to {"Survey Says" if game_mode == "surveysays" else "The Country Says"}', 'success')
+
+    # Save Country Says scoring settings if provided
+    for key, label, min_val, max_val in [
+        ('cs_timer_seconds', 'Timer Duration', 10, 600),
+        ('cs_points_per_answer', 'Points Per Answer', 1, 1000),
+        ('cs_max_speed_bonus', 'Max Speed Bonus', 0, 1000),
+        ('cs_perfect_bonus', 'Perfect Bonus', 0, 2000),
+    ]:
+        val = request.form.get(key, '').strip()
+        if val:
+            try:
+                val_int = max(min_val, min(max_val, int(val)))
+                set_setting(key, str(val_int))
+            except ValueError:
+                pass
 
     return redirect(url_for('.settings'))
 

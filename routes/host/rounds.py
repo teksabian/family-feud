@@ -8,6 +8,7 @@ from config import (
     logger, BASE_DIR,
     AI_SCORING_ENABLED, AI_MODEL_CHOICES,
     FEUD_QUESTIONS_PROMPT, FEUD_ANSWERS_PROMPT, FEUD_REGEN_QUESTION_PROMPT,
+    COUNTRYSAYS_GENERATION_PROMPT, COUNTRYSAYS_ROUNDS_CONFIG,
 )
 from auth import host_required
 from database import db_connect, get_setting, set_setting
@@ -144,6 +145,35 @@ PREBUILT_SURVEYS = {
     },
 }
 
+PREBUILT_COUNTRYSAYS = {
+    "cs_pack1": {
+        "name": "Country Says Pack 1",
+        "rounds": [
+            {"prompt": "The country says... the worst thing to forget on a road trip is ____", "answers": ["Phone", "Wallet", "Charger", "Sunglasses", "Snacks", "Keys", "Toothbrush"]},
+            {"prompt": "The country says... something you always lose is ____", "answers": ["Keys", "Phone", "Remote", "Socks", "Wallet", "Pen", "Glasses"]},
+            {"prompt": "The country says... the best pizza topping is ____", "answers": ["Pepperoni", "Cheese", "Sausage", "Mushroom", "Bacon", "Peppers", "Onion"]},
+            {"prompt": "The country says... something you do before bed is ____", "answers": ["Brush Teeth", "Phone", "Read", "Shower", "TV", "Pray", "Snack"]},
+            {"prompt": "The country says... a reason you'd call in sick to work is ____", "answers": ["Flu", "Headache", "Stomach", "Mental Health", "Hangover", "Interview", "Tired"]},
+            {"prompt": "The country says... something in your junk drawer is ____", "answers": ["Batteries", "Tape", "Scissors", "Pens", "Menus", "Keys", "Rubber Bands"]},
+            {"prompt": "The country says... the worst household chore is ____", "answers": ["Dishes", "Laundry", "Bathroom", "Vacuuming", "Mopping", "Dusting", "Windows"]},
+            {"prompt": "The country says... something you grab when leaving the house is ____", "answers": ["Phone", "Keys", "Wallet", "Sunglasses", "Water", "Jacket", "Bag"]},
+        ]
+    },
+    "cs_pack2": {
+        "name": "Country Says Pack 2",
+        "rounds": [
+            {"prompt": "The country says... the most annoying sound is ____", "answers": ["Alarm", "Nails Chalkboard", "Baby Crying", "Snoring", "Chewing", "Siren", "Mosquito"]},
+            {"prompt": "The country says... something you'd find at a barbecue is ____", "answers": ["Burgers", "Hot Dogs", "Beer", "Corn", "Ribs", "Coleslaw", "Watermelon"]},
+            {"prompt": "The country says... a reason people are late is ____", "answers": ["Traffic", "Overslept", "Kids", "Lost Keys", "Getting Ready", "No Gas", "Weather"]},
+            {"prompt": "The country says... something in your car right now is ____", "answers": ["Phone Charger", "Sunglasses", "Water Bottle", "Napkins", "Change", "Umbrella", "Registration"]},
+            {"prompt": "The country says... a popular New Year's resolution is ____", "answers": ["Lose Weight", "Exercise", "Save Money", "Eat Healthy", "Quit Smoking", "Read More", "Travel"]},
+            {"prompt": "The country says... something you'd bring to a desert island is ____", "answers": ["Water", "Knife", "Phone", "Food", "Lighter", "Rope", "Sunscreen"]},
+            {"prompt": "The country says... the best comfort food is ____", "answers": ["Mac Cheese", "Pizza", "Soup", "Ice Cream", "Grilled Cheese", "Mashed Potatoes", "Fried Chicken"]},
+            {"prompt": "The country says... something people collect is ____", "answers": ["Stamps", "Coins", "Cards", "Shoes", "Records", "Figurines", "Books"]},
+        ]
+    }
+}
+
 
 @host_bp.route('/host/upload-answers', methods=['POST'])
 @host_required
@@ -265,27 +295,57 @@ def upload_answers():
 @host_required
 def create_round():
     """Create a round manually"""
-    round_num = int(request.form.get('round_number'))
+    from database import get_game_mode
+    game_mode = get_game_mode()
+
     question = request.form.get('question', '').strip()
-    logger.info(f"[ROUND] create_round() - round_num={round_num}, question='{question[:50] if question else ''}'")
+    logger.info(f"[ROUND] create_round() - question='{question[:50] if question else ''}', mode={game_mode}")
 
     if not question:
-        flash('Question cannot be empty.', 'error')
+        flash('Question/prompt cannot be empty.', 'error')
         return redirect(url_for('.host_dashboard'))
 
-    config = next((r for r in ROUNDS_CONFIG if r['round'] == round_num), None)
-    if not config:
-        logger.warning(f"[ROUND] create_round() - invalid round number: {round_num}")
-        return "Invalid round number", 400
+    if game_mode == 'countrysays':
+        # Country Says: create round with 7 answers from form
+        num_answers = 7
+        answers = {}
+        for i in range(1, 8):
+            ans = request.form.get(f'answer{i}', '').strip()
+            answers[f'answer{i}'] = ans
 
-    with db_connect() as conn:
-        conn.execute("UPDATE rounds SET is_active = 0")
-        conn.execute("""
-            INSERT INTO rounds (round_number, question, num_answers, is_active)
-            VALUES (?, ?, ?, 1)
-        """, (round_num, question, config['answers']))
-        conn.commit()
-    logger.info(f"[ROUND] create_round() - round {round_num} created and activated")
+        # Get next round number
+        with db_connect() as conn:
+            max_round = conn.execute("SELECT MAX(round_number) as m FROM rounds").fetchone()['m'] or 0
+            round_num = max_round + 1
+
+            conn.execute("UPDATE rounds SET is_active = 0")
+            conn.execute("""
+                INSERT INTO rounds (round_number, question, num_answers, is_active,
+                    answer1, answer2, answer3, answer4, answer5, answer6, answer7)
+                VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+            """, (round_num, question, num_answers,
+                  answers.get('answer1', ''), answers.get('answer2', ''),
+                  answers.get('answer3', ''), answers.get('answer4', ''),
+                  answers.get('answer5', ''), answers.get('answer6', ''),
+                  answers.get('answer7', '')))
+            conn.commit()
+        logger.info(f"[ROUND] create_round() - Country Says round {round_num} created with 7 answers")
+    else:
+        round_num = int(request.form.get('round_number'))
+        config = next((r for r in ROUNDS_CONFIG if r['round'] == round_num), None)
+        if not config:
+            logger.warning(f"[ROUND] create_round() - invalid round number: {round_num}")
+            return "Invalid round number", 400
+
+        with db_connect() as conn:
+            conn.execute("UPDATE rounds SET is_active = 0")
+            conn.execute("""
+                INSERT INTO rounds (round_number, question, num_answers, is_active)
+                VALUES (?, ?, ?, 1)
+            """, (round_num, question, config['answers']))
+            conn.commit()
+        logger.info(f"[ROUND] create_round() - round {round_num} created and activated")
+
     return redirect(url_for('.host_dashboard'))
 
 @host_bp.route('/host/round/<int:round_id>/activate', methods=['POST'])
@@ -315,7 +375,7 @@ def activate_round(round_id):
         conn.execute("BEGIN IMMEDIATE")  # Lock database to prevent race conditions
         try:
             conn.execute("UPDATE rounds SET is_active = 0")
-            conn.execute("UPDATE rounds SET is_active = 1 WHERE id = ?", (round_id,))
+            conn.execute("UPDATE rounds SET is_active = 1, activated_at = CURRENT_TIMESTAMP WHERE id = ?", (round_id,))
             conn.commit()
 
             round_info = conn.execute(
@@ -328,6 +388,13 @@ def activate_round(round_id):
                 'question': round_info['question'],
                 'num_answers': round_info['num_answers']
             }
+
+            # Country Says: include timer data
+            from database import get_game_mode, get_setting
+            if get_game_mode() == 'countrysays':
+                round_started_data['timer_seconds'] = int(get_setting('cs_timer_seconds', '90'))
+                round_started_data['game_mode'] = 'countrysays'
+
             socketio.emit('round:started', round_started_data, to='teams')
             socketio.emit('round:started', round_started_data, to='hosts')
 
@@ -358,7 +425,7 @@ def set_answers(round_id):
 
         fields = []
         values = []
-        for i in range(1, 7):
+        for i in range(1, 8):
             if i <= num_answers:
                 fields.append(f'answer{i} = ?')
                 fields.append(f'answer{i}_count = ?')
@@ -438,7 +505,7 @@ def start_next_round():
                     # Include previous round's survey question + answers for the winner screen
                     round_started_data['previous_question'] = active_round['question']
                     prev_answers = []
-                    for i in range(1, 7):
+                    for i in range(1, 8):
                         ans = active_round[f'answer{i}']
                         if ans:
                             prev_answers.append(ans)
@@ -451,6 +518,12 @@ def start_next_round():
                     ).fetchone()[0]
                     round_started_data['previous_won_on_tiebreaker'] = tied_count > 1
                     round_started_data['previous_tiebreaker_answer'] = active_round['answer1_count']
+
+                # Country Says: include timer data
+                from database import get_game_mode, get_setting
+                if get_game_mode() == 'countrysays':
+                    round_started_data['timer_seconds'] = int(get_setting('cs_timer_seconds', '90'))
+                    round_started_data['game_mode'] = 'countrysays'
 
                 socketio.emit('round:started', round_started_data, to='teams')
                 socketio.emit('round:started', round_started_data, to='hosts')
@@ -508,7 +581,7 @@ def start_next_round():
                     game_over_data['previous_round_number'] = prev_winner['round_number']
                     game_over_data['previous_question'] = active_round['question']
                     prev_answers = []
-                    for i in range(1, 7):
+                    for i in range(1, 8):
                         ans = active_round[f'answer{i}']
                         if ans:
                             prev_answers.append(ans)
@@ -595,6 +668,7 @@ def create_round_manual_form():
     return render_template('create_round_manual.html',
                          rounds_config=DEFAULT_ROUNDS_CONFIG,
                          prebuilt_surveys=PREBUILT_SURVEYS,
+                         prebuilt_countrysays=PREBUILT_COUNTRYSAYS,
                          ai_enabled=AI_SCORING_ENABLED,
                          ai_model_choices=AI_MODEL_CHOICES,
                          current_generation_model=get_current_generation_model() if AI_SCORING_ENABLED else '',
@@ -604,6 +678,47 @@ def create_round_manual_form():
                          max_answers=MAX_ANSWERS,
                          default_num_rounds=DEFAULT_NUM_ROUNDS,
                          default_answers_per_round=DEFAULT_ANSWERS_PER_ROUND)
+
+@host_bp.route('/host/load-countrysays-pack', methods=['POST'])
+@host_required
+def load_countrysays_pack():
+    """Load a prebuilt Country Says pack as rounds."""
+    pack_key = request.form.get('pack_key', '')
+    pack = PREBUILT_COUNTRYSAYS.get(pack_key)
+    if not pack:
+        flash('Invalid Country Says pack selected.', 'error')
+        return redirect(url_for('.create_round_manual_form'))
+
+    try:
+        with db_connect() as conn:
+            conn.execute("DELETE FROM rounds")
+            conn.execute("DELETE FROM submissions")
+
+            for i, rd in enumerate(pack['rounds'], 1):
+                answers = rd['answers']
+                conn.execute("""
+                    INSERT INTO rounds (round_number, question, num_answers,
+                        answer1, answer2, answer3, answer4, answer5, answer6, answer7)
+                    VALUES (?, ?, 7, ?, ?, ?, ?, ?, ?, ?)
+                """, (i, rd['prompt'],
+                      answers[0] if len(answers) > 0 else '',
+                      answers[1] if len(answers) > 1 else '',
+                      answers[2] if len(answers) > 2 else '',
+                      answers[3] if len(answers) > 3 else '',
+                      answers[4] if len(answers) > 4 else '',
+                      answers[5] if len(answers) > 5 else '',
+                      answers[6] if len(answers) > 6 else ''))
+
+            conn.commit()
+        set_setting('rounds_source', 'prebuilt')
+        logger.info(f"[ROUND] Loaded Country Says pack '{pack['name']}' with {len(pack['rounds'])} rounds")
+        flash(f'✅ Loaded {pack["name"]} — {len(pack["rounds"])} rounds ready!', 'success')
+    except Exception as e:
+        logger.error(f"[ROUND] Error loading CS pack: {e}")
+        flash(f'Error loading pack: {str(e)}', 'error')
+
+    return redirect(url_for('.host_dashboard'))
+
 
 @host_bp.route('/host/create-round-manual/submit', methods=['POST'])
 @host_required
@@ -846,8 +961,26 @@ def close_round():
         # Mark round as closed
         conn.execute("UPDATE rounds SET submissions_closed = 1 WHERE id = ?", (active_round['id'],))
         conn.commit()
+
         socketio.emit('round:closed', {'round_id': active_round['id']}, to='teams')
         socketio.emit('round:closed', {'round_id': active_round['id']}, to='hosts')
+
+        # Country Says: auto-score all submissions immediately after emitting round:closed
+        from database import get_game_mode
+        if get_game_mode() == 'countrysays':
+            from routes.scoring import auto_score_countrysays_round
+            auto_score_countrysays_round(active_round['id'])
+            # Emit scoring results to each team
+            scored_subs = conn.execute(
+                "SELECT s.*, tc.team_name FROM submissions s JOIN team_codes tc ON s.code = tc.code WHERE s.round_id = ?",
+                (active_round['id'],)
+            ).fetchall()
+            for sub in scored_subs:
+                socketio.emit('scoring:your_results', {
+                    'score': sub['score'],
+                    'checked_answers': sub['checked_answers'],
+                    'speed_bonus': sub['speed_bonus'],
+                }, to=f'team:{sub["code"]}')
 
         # Count submissions
         sub_count = conn.execute("SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",
