@@ -9,6 +9,7 @@ from config import (
     AI_SCORING_ENABLED, AI_MODEL_CHOICES,
     FEUD_QUESTIONS_PROMPT, FEUD_ANSWERS_PROMPT, FEUD_REGEN_QUESTION_PROMPT,
     CROWDSAYS_TIMER_SECONDS, CROWDSAYS_NUM_ANSWERS,
+    CROWDSAYS_QUESTIONS_PROMPT, CROWDSAYS_ANSWERS_PROMPT,
 )
 from auth import host_required
 from database import db_connect, get_setting, set_setting, get_game_mode
@@ -770,7 +771,9 @@ def generate_questions():
 
         past_questions_block = build_past_questions_block()
         questions_json_example = ', '.join([f'"Question {i}"' for i in range(1, num_rounds + 1)])
-        prompt = FEUD_QUESTIONS_PROMPT.format(
+        mode = get_game_mode()
+        base_prompt = CROWDSAYS_QUESTIONS_PROMPT if mode == 'crowdsays' else FEUD_QUESTIONS_PROMPT
+        prompt = base_prompt.format(
             past_questions_block=past_questions_block,
             num_rounds=num_rounds,
             questions_json_example=questions_json_example
@@ -803,8 +806,13 @@ def generate_round_data():
         questions = body['questions']
 
         # Build rounds config from request body, validated through build_rounds_config
+        mode = get_game_mode()
         submitted_config = body.get('rounds_config', None)
-        if submitted_config and len(submitted_config) == len(questions):
+        if mode == 'crowdsays':
+            from config import CROWDSAYS_ROUNDS_CONFIG
+            # Crowd Says: always 7 answers, adjust round count
+            rounds_config = [{"round": i, "answers": 7} for i in range(1, len(questions) + 1)]
+        elif submitted_config and len(submitted_config) == len(questions):
             per_round_answers = {}
             for item in submitted_config:
                 r = item.get('round') if isinstance(item, dict) else None
@@ -828,7 +836,8 @@ def generate_round_data():
         questions_block = '\n'.join(lines)
 
         past_questions_block = build_past_questions_block()
-        prompt = FEUD_ANSWERS_PROMPT.format(
+        base_prompt = CROWDSAYS_ANSWERS_PROMPT if mode == 'crowdsays' else FEUD_ANSWERS_PROMPT
+        prompt = base_prompt.format(
             questions_block=questions_block,
             past_questions_block=past_questions_block,
             num_rounds=num_rounds,
