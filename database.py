@@ -322,7 +322,7 @@ def init_db():
             ('ai_generation_model', '', 'AI model for round generation'),
             ('color_theme', 'gamenight', 'UI color theme'),
             ('tv_board_enabled', 'true', 'Enable TV board display feature'),
-            ('game_mode', 'showdown', 'Active game mode: showdown or crowdsays'),
+            ('game_mode', 'surveysays', 'Active game mode: surveysays or crowdsays'),
             ('crowdsays_timer_enabled', 'true', 'Enable countdown timer for Crowd Says rounds'),
             ('crowdsays_timer_seconds', '45', 'Timer duration in seconds for Crowd Says rounds'),
         ]
@@ -379,8 +379,8 @@ def nuke_all_data():
 # ============= SETTINGS HELPERS =============
 
 def get_game_mode():
-    """Get the active game mode (showdown or crowdsays)."""
-    return get_setting('game_mode', 'showdown')
+    """Get the active game mode (surveysays or crowdsays)."""
+    return get_setting('game_mode', 'surveysays')
 
 
 def get_setting(key, default=None):

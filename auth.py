@@ -93,9 +93,9 @@ def host_login():
             session['host_authenticated'] = True
             logger.info("Host authenticated successfully")
             # Save selected game mode
-            game_mode = request.form.get('game_mode', 'showdown')
-            if game_mode in ('showdown', 'crowdsays'):
-                set_setting('game_mode', game_mode, 'Active game mode: showdown or crowdsays')
+            game_mode = request.form.get('game_mode', 'surveysays')
+            if game_mode in ('surveysays', 'crowdsays'):
+                set_setting('game_mode', game_mode, 'Active game mode: surveysays or crowdsays')
                 logger.info(f"[HOST] Game mode set to: {game_mode}")
             # On mobile, go straight to photo scan (if AI enabled)
             if AI_SCORING_ENABLED:
