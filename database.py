@@ -299,6 +299,15 @@ def init_db():
             conn.commit()
             logger.info("Migration complete: speed_bonus column added")
 
+        # Migration: Add answer7 to submissions table (for Crowd Says 7-answer rounds)
+        try:
+            conn.execute("SELECT answer7 FROM submissions LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding answer7 column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN answer7 TEXT")
+            conn.commit()
+            logger.info("Migration complete: answer7 column added to submissions")
+
         # Initialize default settings if they don't exist
         default_settings = [
             ('allow_team_registration', 'true', 'Allow new teams to join'),
@@ -314,6 +323,8 @@ def init_db():
             ('color_theme', 'gamenight', 'UI color theme'),
             ('tv_board_enabled', 'true', 'Enable TV board display feature'),
             ('game_mode', 'showdown', 'Active game mode: showdown or crowdsays'),
+            ('crowdsays_timer_enabled', 'true', 'Enable countdown timer for Crowd Says rounds'),
+            ('crowdsays_timer_seconds', '45', 'Timer duration in seconds for Crowd Says rounds'),
         ]
 
         for key, value, description in default_settings:

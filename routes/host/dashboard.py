@@ -139,6 +139,8 @@ def settings():
     mobile_experience = get_setting('mobile_experience', 'advanced_no_pp')
     tv_board_enabled = get_setting('tv_board_enabled', 'true') == 'true'
     current_game_mode = get_setting('game_mode', 'showdown')
+    crowdsays_timer_enabled = get_setting('crowdsays_timer_enabled', 'true') == 'true'
+    crowdsays_timer_seconds = int(get_setting('crowdsays_timer_seconds', '45') or 45)
 
     # Count corrections in current session
     corrections_count = len(load_corrections_history())
@@ -158,7 +160,9 @@ def settings():
                          extended_thinking_enabled=extended_thinking_enabled,
                          thinking_budget_tokens=thinking_budget_tokens,
                          tv_board_enabled=tv_board_enabled,
-                         current_game_mode=current_game_mode)
+                         current_game_mode=current_game_mode,
+                         crowdsays_timer_enabled=crowdsays_timer_enabled,
+                         crowdsays_timer_seconds=crowdsays_timer_seconds)
 
 
 @host_bp.route('/host/toggle-setting', methods=['POST'])
@@ -167,8 +171,8 @@ def toggle_setting():
     """Toggle a boolean setting"""
     setting_key = request.form.get('setting_key')
 
-    if setting_key in ['allow_team_registration', 'system_paused', 'ai_scoring_enabled', 'extended_thinking_enabled', 'auto_ai_scoring', 'tv_board_enabled']:
-        current_value = get_setting(setting_key, 'true' if setting_key in ('ai_scoring_enabled', 'tv_board_enabled') else 'false')
+    if setting_key in ['allow_team_registration', 'system_paused', 'ai_scoring_enabled', 'extended_thinking_enabled', 'auto_ai_scoring', 'tv_board_enabled', 'crowdsays_timer_enabled']:
+        current_value = get_setting(setting_key, 'true' if setting_key in ('ai_scoring_enabled', 'tv_board_enabled', 'crowdsays_timer_enabled') else 'false')
         new_value = 'false' if current_value == 'true' else 'true'
         logger.info(f"[SETTINGS] toggle_setting() - {setting_key}: '{current_value}' -> '{new_value}'")
 
@@ -213,6 +217,21 @@ def toggle_setting():
                     flash('Mobile experience switched to Advanced (No PP Display) — TV Board is required for PP Display mode', 'info')
                     logger.info("[SETTINGS] mobile_experience auto-switched to advanced_no_pp (TV Board disabled)")
 
+    return redirect(url_for('.settings'))
+
+
+@host_bp.route('/host/set-crowdsays-timer', methods=['POST'])
+@host_required
+def set_crowdsays_timer():
+    """Set the Crowd Says timer duration"""
+    try:
+        seconds = int(request.form.get('timer_seconds', 45))
+        seconds = max(15, min(300, seconds))
+    except (ValueError, TypeError):
+        seconds = 45
+    set_setting('crowdsays_timer_seconds', str(seconds), 'Timer duration in seconds for Crowd Says rounds')
+    flash(f'Timer set to {seconds} seconds', 'success')
+    logger.info(f"[SETTINGS] set_crowdsays_timer() - seconds={seconds}")
     return redirect(url_for('.settings'))
 
 

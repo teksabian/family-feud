@@ -19,13 +19,12 @@ team_bp = Blueprint('team', __name__)
 
 
 def _generate_clue(answer):
-    """Generate a letter clue from an answer, e.g., 'Phone' -> 'P _ _ _ _'"""
+    """Generate a letter clue from an answer, e.g., 'Phone' -> 'P ————'"""
     answer = answer.strip()
     if not answer:
         return ''
     first = answer[0].upper()
-    rest = ' '.join('_' for _ in answer[1:])
-    return f'{first} {rest}' if rest else first
+    return f'{first} ————'
 
 
 # ============= JOIN ROUTES =============
@@ -302,10 +301,13 @@ def team_play():
                 ans = active_round[f'answer{i}'] or ''
                 clues.append(_generate_clue(ans))
                 answers_for_matching.append(ans.strip().lower())
+            timer_enabled = get_setting('crowdsays_timer_enabled', 'true') == 'true'
+            timer_seconds = int(get_setting('crowdsays_timer_seconds', '45') or 45)
             cs_data = {
                 'clues': clues,
                 'answers_for_matching': answers_for_matching,
-                'timer_seconds': active_round['timer_seconds'] or CROWDSAYS_TIMER_SECONDS,
+                'timer_enabled': timer_enabled,
+                'timer_seconds': timer_seconds,
             }
 
         if not active_round:
@@ -431,7 +433,7 @@ def submit_answers():
 
         answers = {f'answer{i}': request.form.get(f'answer{i}', '').strip() for i in range(1, num_answers + 1)}
 
-        if not any(answers.values()):
+        if mode != 'crowdsays' and not any(answers.values()):
             if is_ajax:
                 return jsonify({'success': False, 'error': 'Please provide at least one answer.'}), 400
             flash('Please provide at least one answer.', 'error')
