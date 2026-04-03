@@ -510,12 +510,29 @@ def start_next_round():
                     'round_id': next_round['id'],
                     'round_number': next_round['round_number'],
                     'question': next_round['question'],
-                    'num_answers': next_round['num_answers']
+                    'num_answers': next_round['num_answers'],
+                    'mobile_experience': get_setting('mobile_experience', 'advanced_no_pp'),
+                    'previous_round_number': active_round['round_number'],
                 }
+
+                # Build cumulative leaderboard for between-rounds interstitial
+                teams = conn.execute("""
+                    SELECT tc.team_name, tc.code,
+                           COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score
+                    FROM team_codes tc
+                    LEFT JOIN submissions s ON tc.code = s.code
+                    WHERE tc.used = 1 AND tc.team_name IS NOT NULL
+                    GROUP BY tc.code
+                    ORDER BY total_score DESC, tc.team_name ASC
+                """).fetchall()
+                round_started_data['leaderboard'] = [
+                    {'team_name': r['team_name'], 'total_score': r['total_score'], 'rank': i + 1}
+                    for i, r in enumerate(teams)
+                ]
+
                 if prev_winner and prev_winner['winner_code']:
                     round_started_data['previous_winner_team'] = prev_winner['team_name']
                     round_started_data['previous_winner_score'] = prev_winner['score']
-                    round_started_data['previous_round_number'] = prev_winner['round_number']
 
                     # Include previous round's survey question + answers for the winner screen
                     round_started_data['previous_question'] = active_round['question']

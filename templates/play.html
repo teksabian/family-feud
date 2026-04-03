@@ -2178,10 +2178,29 @@
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
             if (typeof scoresRevealed !== 'undefined') scoresRevealed = false;
-            if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
-                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
-            } else {
+
+            var mode = data.mobile_experience || (typeof mobileExperience !== 'undefined' ? mobileExperience : 'advanced_no_pp');
+
+            if (mode === 'basic') {
+                // Basic mode: just reload
                 window.location.href = '/play';
+            } else if (mode === 'advanced_pp') {
+                // PP mode: show winner interstitial if available, else reload
+                if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
+                    showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
+                } else {
+                    window.location.href = '/play';
+                }
+            } else {
+                // advanced_no_pp: show winner interstitial if available, else show leaderboard briefly
+                if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
+                    showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
+                } else if (data.leaderboard && typeof renderLeaderboard === 'function') {
+                    renderLeaderboard(data.leaderboard);
+                    setTimeout(function() { window.location.href = '/play'; }, 5000);
+                } else {
+                    window.location.href = '/play';
+                }
             }
         });
 
