@@ -19,12 +19,15 @@ team_bp = Blueprint('team', __name__)
 
 
 def _generate_clue(answer):
-    """Generate a letter clue from an answer, e.g., 'Phone' -> 'P ————'"""
+    """Generate a letter clue, e.g., 'Phone' -> 'P ————' (dash length matches answer)"""
     answer = answer.strip()
     if not answer:
         return ''
     first = answer[0].upper()
-    return f'{first} ————'
+    remaining = len(answer) - 1
+    if remaining <= 0:
+        return first
+    return f'{first} {"—" * remaining}'
 
 
 # ============= JOIN ROUTES =============
@@ -296,16 +299,13 @@ def team_play():
         cs_data = {}
         if mode == 'crowdsays' and active_round:
             clues = []
-            answers_for_matching = []
             for i in range(1, active_round['num_answers'] + 1):
                 ans = active_round[f'answer{i}'] or ''
                 clues.append(_generate_clue(ans))
-                answers_for_matching.append(ans.strip().lower())
             timer_enabled = get_setting('crowdsays_timer_enabled', 'true') == 'true'
             timer_seconds = int(get_setting('crowdsays_timer_seconds', '45') or 45)
             cs_data = {
                 'clues': clues,
-                'answers_for_matching': answers_for_matching,
                 'timer_enabled': timer_enabled,
                 'timer_seconds': timer_seconds,
             }

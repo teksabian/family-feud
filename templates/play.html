@@ -46,6 +46,7 @@
             padding: 0;
             padding-top: 110px; /* Space for fixed header (increased for bigger question) */
             padding-bottom: 15px;
+            transition: padding-top 0.15s ease;
         }
         
         /* FIXED HEADER - Always visible at top */
@@ -1560,31 +1561,21 @@
                 </div>
                 {% endif %}
 
-                <!-- Answer Progress -->
-                <div class="answer-progress" id="answerProgress">
-                    <span id="progressText">0 of {{ num_answers }} correct</span>
-                    <div class="answer-progress-bar">
-                        <div class="answer-progress-fill" id="progressFill"></div>
-                    </div>
-                </div>
-
                 <form id="answerForm" method="POST" action="{{ url_for('team.submit_answers') }}?v={{ cache_bust }}" onsubmit="return validateAnswers(event)">
                     <input type="hidden" name="round_id" value="{{ round_id }}">
                     <input type="hidden" name="tiebreaker" value="0">
 
                     {% for i in range(1, num_answers + 1) %}
                     <div class="answer-group cs-answer-group" id="cs-answer-{{ i }}" style="position: relative;">
-                        <div class="answer-label" style="display: flex; justify-content: space-between;">
+                        <div class="answer-label">
                             <span style="font-family: 'Courier New', monospace; letter-spacing: 2px; color: var(--text-accent);">{{ clues[i-1] }}</span>
-                            <span class="cs-match-indicator" id="cs-match-{{ i }}" style="display: none; color: var(--success, #28a745); font-weight: bold;">&#10003;</span>
                         </div>
                         <input type="text"
                                name="answer{{ i }}"
                                placeholder="Type your guess..."
                                autocomplete="off" autocorrect="off" autocapitalize="off"
                                class="cs-input"
-                               data-answer-num="{{ i }}"
-                               oninput="checkCrowdSaysMatch(this, {{ i }})">
+                               data-answer-num="{{ i }}">
                     </div>
                     {% endfor %}
 
@@ -1594,46 +1585,9 @@
                 </form>
 
                 <script>
-                // Crowd Says client-side matching data
-                var csAnswers = {{ answers_for_matching|tojson }};
-                var csMatched = {};
                 var csTimerSeconds = {{ timer_seconds|default(45) }};
                 var csTimerEnabled = {{ 'true' if timer_enabled|default(true) else 'false' }};
                 var csTimerStarted = false;
-
-                function checkCrowdSaysMatch(input, num) {
-                    var val = input.value.trim().toLowerCase();
-                    var indicator = document.getElementById('cs-match-' + num);
-                    var group = document.getElementById('cs-answer-' + num);
-
-                    // Check if this answer matches any of the survey answers
-                    var matched = false;
-                    for (var j = 0; j < csAnswers.length; j++) {
-                        if (val && val === csAnswers[j]) {
-                            matched = true;
-                            csMatched[num] = true;
-                            break;
-                        }
-                    }
-
-                    if (matched) {
-                        indicator.style.display = 'inline';
-                        group.style.borderLeft = '3px solid var(--success, #28a745)';
-                        input.style.background = 'rgba(40, 167, 69, 0.15)';
-                    } else {
-                        indicator.style.display = 'none';
-                        group.style.borderLeft = 'none';
-                        input.style.background = '';
-                        delete csMatched[num];
-                    }
-
-                    // Update progress
-                    var matchCount = Object.keys(csMatched).length;
-                    var progressText = document.getElementById('progressText');
-                    var progressFill = document.getElementById('progressFill');
-                    if (progressText) progressText.textContent = matchCount + ' of ' + csAnswers.length + ' correct';
-                    if (progressFill) progressFill.style.width = (matchCount / csAnswers.length * 100) + '%';
-                }
 
                 // Timer countdown
                 function startCrowdSaysTimer() {
@@ -2111,6 +2065,19 @@
             var form = document.getElementById('answerForm');
             if (!form) return;
 
+            // Prevent header taps from stealing focus / closing keyboard
+            var header = document.querySelector('.fixed-header');
+            if (header) {
+                function preventFocusSteal(e) {
+                    if (e.target.closest('.settings-gear')) return;
+                    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                        e.preventDefault();
+                    }
+                }
+                header.addEventListener('touchstart', preventFocusSteal);
+                header.addEventListener('mousedown', preventFocusSteal);
+            }
+
             // Restore saved answers + update progress
             restoreAnswers();
             updateProgress();
@@ -2128,19 +2095,18 @@
                 // Compact header on mobile keyboard open
                 input.addEventListener('focus', function() {
                     compactHeader();
-                    // Scroll input into view after header transition (manual calc to avoid iOS fixed-header bugs)
                     var self = this;
                     setTimeout(function() {
-                        var hdr = document.querySelector('.fixed-header');
-                        var headerHeight = hdr ? hdr.offsetHeight : 0;
-                        var inputRect = self.getBoundingClientRect();
-                        var targetY = window.scrollY + inputRect.top - headerHeight - 20;
-                        if (targetY > 0) {
-                            window.scrollTo({ top: targetY, behavior: 'smooth' });
-                        }
-                    }, 150);
+                        self.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
                 });
-                input.addEventListener('blur', expandHeader);
+                input.addEventListener('blur', function() {
+                    setTimeout(function() {
+                        if (!document.activeElement || document.activeElement.tagName !== 'INPUT') {
+                            expandHeader();
+                        }
+                    }, 100);
+                });
             });
 
             // Idle detection
@@ -2167,20 +2133,6 @@
             if (text) localStorage.setItem('broadcast_dismiss_' + btoa(text), 'true');
             document.getElementById('broadcast-banner').style.display = 'none';
         }
-    </script>
-
-    <script>
-        // Fix: Keep fixed header pinned when mobile keyboard opens
-        (function() {
-            if (!window.visualViewport) return;
-            var header = document.querySelector('.fixed-header');
-            if (!header) return;
-            function onViewportChange() {
-                header.style.top = window.visualViewport.offsetTop + 'px';
-            }
-            window.visualViewport.addEventListener('resize', onViewportChange);
-            window.visualViewport.addEventListener('scroll', onViewportChange);
-        })();
     </script>
 
     {% endif %}

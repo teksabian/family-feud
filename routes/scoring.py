@@ -749,10 +749,15 @@ def update_score(submission_id):
         # Store previous score before updating
         previous_score = submission['score'] if submission['score'] is not None else 0
 
-        score = 0
-        for ans_num in checked_answers:
-            points = round_info['num_answers'] - ans_num + 1
-            score += points
+        mode = get_game_mode()
+        speed_bonus = 0
+        if mode == 'crowdsays':
+            score, speed_bonus = _score_crowdsays(checked_answers, round_info, submission)
+        else:
+            score = 0
+            for ans_num in checked_answers:
+                points = round_info['num_answers'] - ans_num + 1
+                score += points
 
         # Store which answers were checked
         checked_answers_str = ','.join(map(str, sorted(checked_answers))) if checked_answers else ''
