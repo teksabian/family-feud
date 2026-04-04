@@ -19,15 +19,11 @@ team_bp = Blueprint('team', __name__)
 
 
 def _generate_clue(answer):
-    """Generate a letter clue, e.g., 'Phone' -> 'P ————' (dash length matches answer)"""
+    """Generate a clue dict: first letter + remaining length."""
     answer = answer.strip()
     if not answer:
-        return ''
-    first = answer[0].upper()
-    remaining = len(answer) - 1
-    if remaining <= 0:
-        return first
-    return f'{first} {"—" * remaining}'
+        return {'letter': '', 'length': 0}
+    return {'letter': answer[0].upper(), 'length': len(answer) - 1}
 
 
 # ============= JOIN ROUTES =============

@@ -1567,8 +1567,9 @@
 
                     {% for i in range(1, num_answers + 1) %}
                     <div class="answer-group cs-answer-group" id="cs-answer-{{ i }}" style="position: relative;">
-                        <div class="answer-label">
-                            <span style="font-family: 'Courier New', monospace; letter-spacing: 2px; color: var(--text-accent);">{{ clues[i-1] }}</span>
+                        <div class="answer-label" style="display: flex; align-items: center;">
+                            <span style="font-family: 'Courier New', monospace; color: var(--text-accent); font-weight: bold; font-size: 1.1em;">{{ clues[i-1].letter }}</span>
+                            <span style="display: inline-block; width: {{ clues[i-1].length }}ch; border-bottom: 2px solid var(--text-accent); margin-left: 6px;"></span>
                         </div>
                         <input type="text"
                                name="answer{{ i }}"

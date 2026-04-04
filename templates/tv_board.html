@@ -382,9 +382,8 @@
     function generateClue(text) {
         if (!text) return '';
         var first = text.charAt(0).toUpperCase();
-        var rest = [];
-        for (var k = 1; k < text.length; k++) rest.push('_');
-        return first + (rest.length ? ' ' + rest.join(' ') : '');
+        var lineWidth = Math.max(0, text.length - 1);
+        return first + (lineWidth > 0 ? ' <span style="display:inline-block;width:' + lineWidth + 'ch;border-bottom:2px solid currentColor;vertical-align:middle;"></span>' : '');
     }
 
     function createTile(answer) {
@@ -397,7 +396,7 @@
             tile.innerHTML =
                 '<div class="tile-inner">' +
                     '<div class="tile-front">' +
-                        '<span style="font-family: Courier New, monospace; letter-spacing: 3px; font-size: 1.1em;">' + escapeHtml(clue) + '</span>' +
+                        '<span style="font-family: Courier New, monospace; font-size: 1.1em;">' + clue + '</span>' +
                     '</div>' +
                     '<div class="tile-back">' +
                         '<span class="tile-answer">' + escapeHtml(answer.text || '') + '</span>' +
