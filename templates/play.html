@@ -2000,7 +2000,7 @@
         }
 
         // ======== AUTO-SAVE ========
-        const AUTOSAVE_KEY = 'feud_answers_{{ code }}_round_{{ round_id }}';
+        const AUTOSAVE_KEY = 'feud_answers_{{ code }}_{{ cache_bust }}_round_{{ round_id }}';
 
         function saveAnswers() {
             const form = document.getElementById('answerForm');
@@ -2285,11 +2285,21 @@
 
         socket.on('game:reset', (data) => {
             console.log('[WS] game:reset', data);
+            try {
+                Object.keys(localStorage).forEach(function(key) {
+                    if (key.startsWith('feud_answers_')) localStorage.removeItem(key);
+                });
+            } catch (e) {}
             window.location.href = '/';
         });
 
         socket.on('game:over', (data) => {
             console.log('[WS] game:over', data);
+            try {
+                Object.keys(localStorage).forEach(function(key) {
+                    if (key.startsWith('feud_answers_')) localStorage.removeItem(key);
+                });
+            } catch (e) {}
             socket.disconnect();
             function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
