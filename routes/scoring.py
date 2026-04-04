@@ -166,6 +166,48 @@ def run_ai_scoring_for_submission(submission_id, auto_accept=False):
                 }, to=f'team:{submission["code"]}')
                 emit_leaderboard_update()
 
+                # Check if all submissions for this round are now scored
+                total_subs = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ?",
+                    (submission['round_id'],)
+                ).fetchone()['cnt']
+                scored_subs = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM submissions WHERE round_id = ? AND host_submitted = 1",
+                    (submission['round_id'],)
+                ).fetchone()['cnt']
+
+                logger.info(f"[AUTO-AI] Round progress: {scored_subs}/{total_subs} teams scored")
+
+                if total_subs > 0 and scored_subs == total_subs:
+                    logger.info("[AUTO-AI] ALL TEAMS SCORED - determining winner")
+                    winner = conn.execute("""
+                        SELECT code, score FROM submissions
+                        WHERE round_id = ?
+                        ORDER BY score DESC, tiebreaker DESC
+                        LIMIT 1
+                    """, (submission['round_id'],)).fetchone()
+
+                    if winner:
+                        conn.execute(
+                            "UPDATE rounds SET winner_code = ? WHERE id = ?",
+                            (winner['code'], submission['round_id'])
+                        )
+
+                        winner_team = conn.execute(
+                            "SELECT team_name FROM team_codes WHERE code = ?",
+                            (winner['code'],)
+                        ).fetchone()
+                        winner_name = winner_team['team_name'] if winner_team else 'Unknown'
+
+                        socketio.emit('scoring:all_complete', {
+                            'round_id': submission['round_id'],
+                            'winner_code': winner['code'],
+                            'winner_team': winner_name,
+                            'winner_score': winner['score']
+                        }, to='hosts')
+
+                        logger.info(f"[AUTO-AI] WINNER: code={winner['code']}, score={winner['score']} for round_id={submission['round_id']}")
+
             conn.commit()
 
             unscored = conn.execute("SELECT COUNT(*) FROM submissions WHERE host_submitted = 0").fetchone()[0]
