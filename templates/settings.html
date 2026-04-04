@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Pub Family Feud</title>
+    <title>Settings - Survey Says</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -485,6 +485,63 @@
                 {% endif %}
             </div>
         </div>
+
+        {% if game_mode == 'crowdsays' %}
+        <!-- Crowd Says Timer Settings -->
+        <div class="card">
+            <h2>⏱️ Timer Settings</h2>
+            <form method="POST" action="{{ url_for('host.toggle_setting') }}?v={{ cache_bust }}">
+                <input type="hidden" name="setting_key" value="crowdsays_timer_enabled">
+                <div class="toggle-container">
+                    <span class="toggle-label">Countdown Timer</span>
+                    <div class="toggle-switch {% if crowdsays_timer_enabled %}active{% endif %}"
+                         onclick="this.closest('form').submit()">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </form>
+            <div class="help-text" style="margin-bottom: 15px;">
+                {% if crowdsays_timer_enabled %}
+                    🟢 Timer is <strong>ON</strong> — teams have a time limit to submit answers
+                {% else %}
+                    🔴 Timer is <strong>OFF</strong> — no time limit, teams submit when ready
+                {% endif %}
+            </div>
+            {% if crowdsays_timer_enabled %}
+            <form method="POST" action="{{ url_for('host.set_crowdsays_timer') }}?v={{ cache_bust }}">
+                <div class="form-group">
+                    <label for="timer_seconds">Timer Duration (seconds)</label>
+                    <input type="number" name="timer_seconds" id="timer_seconds"
+                           value="{{ crowdsays_timer_seconds }}" min="15" max="300" step="5"
+                           style="width: 100%; padding: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); border: 1px solid var(--card-border); border-radius: 8px; color: var(--text); font-size: 1em;">
+                    <button type="submit" class="btn-save" style="margin-top: 10px;">Save Timer</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Crowd Says Speed Bonus -->
+        <div class="card">
+            <h2>🚀 Speed Bonus</h2>
+            <form method="POST" action="{{ url_for('host.toggle_setting') }}?v={{ cache_bust }}">
+                <input type="hidden" name="setting_key" value="crowdsays_speed_bonus_enabled">
+                <div class="toggle-container">
+                    <span class="toggle-label">Speed Bonus</span>
+                    <div class="toggle-switch {% if crowdsays_speed_bonus_enabled %}active{% endif %}"
+                         onclick="this.closest('form').submit()">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </form>
+            <div class="help-text" style="margin-bottom: 15px;">
+                {% if crowdsays_speed_bonus_enabled %}
+                    🟢 Speed bonus is <strong>ON</strong> — up to 200 bonus points for submitting fast. Scales linearly from full bonus (instant submit) to zero (full timer used).
+                {% else %}
+                    🔴 Speed bonus is <strong>OFF</strong> — no bonus for speed, only correct answers and perfect bonus count
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Mobile Experience -->
         <div class="card">

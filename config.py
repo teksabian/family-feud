@@ -46,7 +46,7 @@ if IS_RENDER:
         handlers=[logging.StreamHandler()]
     )
     logger = logging.getLogger(__name__)
-    logger.info("FAMILY FEUD - SERVER STARTING (RENDER)")
+    logger.info("SURVEY SAYS - SERVER STARTING (RENDER)")
 else:
     # Local development - log to file and console
     LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -67,7 +67,7 @@ else:
     )
 
     logger = logging.getLogger(__name__)
-    logger.info(f"FAMILY FEUD - SERVER STARTING (log file: {log_filepath})")
+    logger.info(f"SURVEY SAYS - SERVER STARTING (log file: {log_filepath})")
 
 # Suppress Flask/Werkzeug per-request logging noise
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
@@ -114,6 +114,63 @@ logger.info("All sessions from previous server runs are now invalid")
 # Access: reset_state['counter']   Mutate: reset_state['counter'] += 1
 reset_state = {'counter': 0}
 logger.info(f"Reset counter initialized: {reset_state['counter']}")
+
+# ===== CROWD SAYS CONSTANTS =====
+CROWDSAYS_TIMER_SECONDS = 45
+CROWDSAYS_POINTS_PER_ANSWER = 100
+CROWDSAYS_MAX_SPEED_BONUS = 200
+CROWDSAYS_PERFECT_BONUS = 300
+CROWDSAYS_NUM_ANSWERS = 7
+CROWDSAYS_ROUNDS_CONFIG = [{"round": i, "answers": 7} for i in range(1, 9)]
+
+CROWDSAYS_QUESTIONS_PROMPT = """You are a game show writer for "The Crowd Says" — a fill-in-the-blank survey game. Generate {num_rounds} fill-in-the-blank prompts.
+
+Requirements:
+- Each prompt should be a fill-in-the-blank statement like "The crowd says... the worst thing to forget on a road trip is ____"
+- Prompts should be fun, relatable, and work for a pub game audience
+- Every prompt MUST start with "The crowd says..."
+- Topics should be everyday life, pop culture, food, travel, relationships, work, etc.
+- Avoid controversial, political, or offensive topics
+- Each prompt should have many possible common answers (at least 7 obvious ones)
+
+{past_questions_block}
+
+Respond with ONLY valid JSON (no markdown, no explanation):
+{{"questions": [{questions_json_example}]}}"""
+
+CROWDSAYS_ANSWERS_PROMPT = """You are a game show writer for "The Crowd Says" — a fill-in-the-blank survey game. Generate 7 common survey answers for each of the following {num_rounds} prompts.
+
+{questions_block}
+
+Requirements:
+- Generate EXACTLY 7 answers per prompt
+- Answers should be the most common/obvious responses people would give
+- Keep answers concise (1-3 words)
+- No duplicate answers within a prompt
+- All answers should start with a DIFFERENT first letter (this is critical — each answer must begin with a unique letter so letter clues work)
+- Answers are all worth equal points (100 each), so no point values needed — just use 100 for all
+
+{past_questions_block}
+
+Respond with ONLY valid JSON in this exact format (no markdown, no explanation):
+{{
+  "rounds": [
+    {{
+      "question": "The crowd says... the worst thing to forget on a road trip is ____",
+      "answers": [
+        {{"text": "Phone", "points": 100}},
+        {{"text": "Wallet", "points": 100}},
+        {{"text": "Charger", "points": 100}},
+        {{"text": "Snacks", "points": 100}},
+        {{"text": "Keys", "points": 100}},
+        {{"text": "Toothbrush", "points": 100}},
+        {{"text": "Directions", "points": 100}}
+      ]
+    }}
+  ]
+}}
+
+Generate exactly {num_rounds} rounds. Use the exact prompts provided above. Each answer object must have "text" and "points" keys (all points = 100)."""
 
 # ===== PATHS =====
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

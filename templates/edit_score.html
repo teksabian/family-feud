@@ -105,7 +105,7 @@
             <div class="checkbox-item">
                 <input type="checkbox" name="answer_{{ i }}" value="1" {% if auto_checks[i] %}checked{% endif %}>
                 <label>#{{ i }} {{ round['answer' ~ i] }}</label>
-                <span class="points">{{ round.num_answers - i + 1 }}pts</span>
+                <span class="points">{% if game_mode == 'crowdsays' %}100pts{% else %}{{ round.num_answers - i + 1 }}pts{% endif %}</span>
             </div>
             {% endfor %}
             

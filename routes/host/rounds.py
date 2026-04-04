@@ -8,9 +8,11 @@ from config import (
     logger, BASE_DIR,
     AI_SCORING_ENABLED, AI_MODEL_CHOICES,
     FEUD_QUESTIONS_PROMPT, FEUD_ANSWERS_PROMPT, FEUD_REGEN_QUESTION_PROMPT,
+    CROWDSAYS_TIMER_SECONDS, CROWDSAYS_NUM_ANSWERS,
+    CROWDSAYS_QUESTIONS_PROMPT, CROWDSAYS_ANSWERS_PROMPT,
 )
 from auth import host_required
-from database import db_connect, get_setting, set_setting
+from database import db_connect, get_setting, set_setting, get_game_mode
 from survey_history import save_survey_history, build_past_questions_block
 from extensions import socketio
 from parsers import parse_pptx, parse_docx
@@ -20,6 +22,7 @@ from ai import (
 )
 
 from routes.host import (host_bp, ROUNDS_CONFIG, DEFAULT_ROUNDS_CONFIG, build_rounds_config,
+                         get_rounds_config,
                          MIN_ROUNDS, MAX_ROUNDS, MIN_ANSWERS, MAX_ANSWERS,
                          DEFAULT_NUM_ROUNDS, DEFAULT_ANSWERS_PER_ROUND)
 
@@ -140,6 +143,84 @@ PREBUILT_SURVEYS = {
             {"question": "Name Something People Collect", "answers": ["Stamps", "Coins", "Baseball Cards", "Dolls", "Rocks"], "answer1_count": 35},
             {"question": "Name A Reason You Might Stay Home From Work", "answers": ["Sick", "Kid Is Sick", "Bad Weather", "Mental Health Day", "Appointment"], "answer1_count": 55},
             {"question": "Name Something You Would Find On A Beach", "answers": ["Sand", "Shells", "Towels", "Seagulls", "Waves/Water"], "answer1_count": 48},
+        ]
+    },
+}
+
+# Pre-built Crowd Says packs for quick round creation
+PREBUILT_CROWDSAYS = {
+    "cs_pack1": {
+        "name": "Crowd Says Pack 1 - Everyday Life",
+        "rounds": [
+            {
+                "question": "The crowd says... the worst thing to forget on a road trip is ____",
+                "answers": ["Phone", "Wallet", "Charger", "Sunglasses", "Snacks", "Keys", "Toothbrush"]
+            },
+            {
+                "question": "The crowd says... the most popular pizza topping is ____",
+                "answers": ["Pepperoni", "Mushrooms", "Sausage", "Onions", "Peppers", "Olives", "Bacon"]
+            },
+            {
+                "question": "The crowd says... something you always lose is ____",
+                "answers": ["Keys", "Phone", "Remote", "Socks", "Glasses", "Wallet", "Pen"]
+            },
+            {
+                "question": "The crowd says... the best excuse for being late is ____",
+                "answers": ["Traffic", "Alarm", "Kids", "Weather", "Car trouble", "Meeting", "Parking"]
+            },
+            {
+                "question": "The crowd says... something you check before leaving the house is ____",
+                "answers": ["Phone", "Keys", "Wallet", "Stove", "Lights", "Lock", "Hair"]
+            },
+            {
+                "question": "The crowd says... a popular thing to binge-watch is ____",
+                "answers": ["Reality TV", "Crime shows", "Sitcoms", "Documentaries", "Drama", "Anime", "Cooking shows"]
+            },
+            {
+                "question": "The crowd says... the worst household chore is ____",
+                "answers": ["Dishes", "Laundry", "Mopping", "Toilets", "Vacuuming", "Dusting", "Yard work"]
+            },
+            {
+                "question": "The crowd says... something found in every junk drawer is ____",
+                "answers": ["Batteries", "Tape", "Scissors", "Pens", "Menus", "Rubber bands", "Screwdriver"]
+            },
+        ]
+    },
+    "cs_pack2": {
+        "name": "Crowd Says Pack 2 - Fun & Games",
+        "rounds": [
+            {
+                "question": "The crowd says... a reason people go to the gym is ____",
+                "answers": ["Lose weight", "Muscles", "Health", "Stress", "Energy", "Dating", "Doctor said so"]
+            },
+            {
+                "question": "The crowd says... the most annoying sound is ____",
+                "answers": ["Alarm", "Snoring", "Nails on chalkboard", "Baby crying", "Car horn", "Chewing", "Mosquito"]
+            },
+            {
+                "question": "The crowd says... something people do on their phone in bed is ____",
+                "answers": ["Social media", "Texting", "Games", "News", "Videos", "Email", "Shopping"]
+            },
+            {
+                "question": "The crowd says... a popular New Year's resolution is ____",
+                "answers": ["Exercise", "Diet", "Save money", "Quit smoking", "Read more", "Travel", "Less screen time"]
+            },
+            {
+                "question": "The crowd says... something you'd find at a BBQ is ____",
+                "answers": ["Burgers", "Hot dogs", "Corn", "Beer", "Chips", "Coleslaw", "Watermelon"]
+            },
+            {
+                "question": "The crowd says... a popular Halloween costume is ____",
+                "answers": ["Witch", "Vampire", "Ghost", "Zombie", "Cat", "Superhero", "Pirate"]
+            },
+            {
+                "question": "The crowd says... something you'd bring to a desert island is ____",
+                "answers": ["Water", "Knife", "Phone", "Matches", "Food", "Sunscreen", "Rope"]
+            },
+            {
+                "question": "The crowd says... a famous movie snack is ____",
+                "answers": ["Popcorn", "Candy", "Nachos", "Soda", "Hot dog", "Pretzels", "Ice cream"]
+            },
         ]
     },
 }
@@ -315,7 +396,7 @@ def activate_round(round_id):
         conn.execute("BEGIN IMMEDIATE")  # Lock database to prevent race conditions
         try:
             conn.execute("UPDATE rounds SET is_active = 0")
-            conn.execute("UPDATE rounds SET is_active = 1 WHERE id = ?", (round_id,))
+            conn.execute("UPDATE rounds SET is_active = 1, activated_at = CURRENT_TIMESTAMP WHERE id = ?", (round_id,))
             conn.commit()
 
             round_info = conn.execute(
@@ -358,7 +439,8 @@ def set_answers(round_id):
 
         fields = []
         values = []
-        for i in range(1, 7):
+        max_answer_col = 8 if get_game_mode() == 'crowdsays' else 7
+        for i in range(1, max_answer_col):
             if i <= num_answers:
                 fields.append(f'answer{i} = ?')
                 fields.append(f'answer{i}_count = ?')
@@ -424,16 +506,55 @@ def start_next_round():
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
 
+                # Fallback: if winner_code not set, determine winner from scored submissions
+                if not prev_winner or not prev_winner['winner_code']:
+                    fallback = conn.execute("""
+                        SELECT s.code, s.score, tc.team_name
+                        FROM submissions s
+                        JOIN team_codes tc ON s.code = tc.code
+                        WHERE s.round_id = ? AND s.host_submitted = 1
+                        ORDER BY s.score DESC, s.tiebreaker DESC
+                        LIMIT 1
+                    """, (active_round['id'],)).fetchone()
+                    if fallback:
+                        conn.execute("UPDATE rounds SET winner_code = ? WHERE id = ?",
+                                    (fallback['code'], active_round['id']))
+                        conn.commit()
+                        prev_winner = conn.execute("""
+                            SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                            FROM rounds r
+                            LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                            LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
+                            WHERE r.id = ?
+                        """, (active_round['id'],)).fetchone()
+
                 round_started_data = {
                     'round_id': next_round['id'],
                     'round_number': next_round['round_number'],
                     'question': next_round['question'],
-                    'num_answers': next_round['num_answers']
+                    'num_answers': next_round['num_answers'],
+                    'mobile_experience': get_setting('mobile_experience', 'advanced_no_pp'),
+                    'previous_round_number': active_round['round_number'],
                 }
+
+                # Build cumulative leaderboard for between-rounds interstitial
+                teams = conn.execute("""
+                    SELECT tc.team_name, tc.code,
+                           COALESCE(SUM(CASE WHEN s.host_submitted = 1 THEN s.score ELSE 0 END), 0) as total_score
+                    FROM team_codes tc
+                    LEFT JOIN submissions s ON tc.code = s.code
+                    WHERE tc.used = 1 AND tc.team_name IS NOT NULL
+                    GROUP BY tc.code
+                    ORDER BY total_score DESC, tc.team_name ASC
+                """).fetchall()
+                round_started_data['leaderboard'] = [
+                    {'team_name': r['team_name'], 'total_score': r['total_score'], 'rank': i + 1}
+                    for i, r in enumerate(teams)
+                ]
+
                 if prev_winner and prev_winner['winner_code']:
                     round_started_data['previous_winner_team'] = prev_winner['team_name']
                     round_started_data['previous_winner_score'] = prev_winner['score']
-                    round_started_data['previous_round_number'] = prev_winner['round_number']
 
                     # Include previous round's survey question + answers for the winner screen
                     round_started_data['previous_question'] = active_round['question']
@@ -501,6 +622,28 @@ def start_next_round():
                     LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
+
+                # Fallback: if winner_code not set, determine winner from scored submissions
+                if not prev_winner or not prev_winner['winner_code']:
+                    fallback = conn.execute("""
+                        SELECT s.code, s.score, tc.team_name
+                        FROM submissions s
+                        JOIN team_codes tc ON s.code = tc.code
+                        WHERE s.round_id = ? AND s.host_submitted = 1
+                        ORDER BY s.score DESC, s.tiebreaker DESC
+                        LIMIT 1
+                    """, (active_round['id'],)).fetchone()
+                    if fallback:
+                        conn.execute("UPDATE rounds SET winner_code = ? WHERE id = ?",
+                                    (fallback['code'], active_round['id']))
+                        conn.commit()
+                        prev_winner = conn.execute("""
+                            SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                            FROM rounds r
+                            LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                            LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
+                            WHERE r.id = ?
+                        """, (active_round['id'],)).fetchone()
 
                 if prev_winner and prev_winner['winner_code']:
                     game_over_data['previous_winner_team'] = prev_winner['team_name']
@@ -592,9 +735,12 @@ def update_single_answer(round_id, answer_num):
 @host_required
 def create_round_manual_form():
     """Show manual round creation form"""
+    mode = get_game_mode()
+    rounds_config = get_rounds_config()
     return render_template('create_round_manual.html',
-                         rounds_config=DEFAULT_ROUNDS_CONFIG,
+                         rounds_config=rounds_config,
                          prebuilt_surveys=PREBUILT_SURVEYS,
+                         prebuilt_crowdsays=PREBUILT_CROWDSAYS,
                          ai_enabled=AI_SCORING_ENABLED,
                          ai_model_choices=AI_MODEL_CHOICES,
                          current_generation_model=get_current_generation_model() if AI_SCORING_ENABLED else '',
@@ -609,9 +755,10 @@ def create_round_manual_form():
 @host_required
 def create_round_manual_submit():
     """Process manual round creation for all rounds"""
+    mode = get_game_mode()
     num_rounds = int(request.form.get('num_rounds', 8) or 8)
     num_rounds = max(MIN_ROUNDS, min(MAX_ROUNDS, num_rounds))
-    logger.info(f"[ROUND] create_round_manual_submit() - creating {num_rounds} rounds manually")
+    logger.info(f"[ROUND] create_round_manual_submit() - creating {num_rounds} rounds manually (mode={mode})")
     try:
         with db_connect() as conn:
             # Delete any existing rounds and submissions
@@ -620,8 +767,11 @@ def create_round_manual_submit():
 
             # Create all rounds dynamically
             for round_num in range(1, num_rounds + 1):
-                num_answers = int(request.form.get(f'round_{round_num}_num_answers', 4) or 4)
-                num_answers = max(MIN_ANSWERS, min(MAX_ANSWERS, num_answers))
+                if mode == 'crowdsays':
+                    num_answers = CROWDSAYS_NUM_ANSWERS
+                else:
+                    num_answers = int(request.form.get(f'round_{round_num}_num_answers', 4) or 4)
+                    num_answers = max(MIN_ANSWERS, min(MAX_ANSWERS, num_answers))
 
                 # Get question for this round
                 question = request.form.get(f'question{round_num}', '').strip()
@@ -635,15 +785,21 @@ def create_round_manual_submit():
                 is_active = 0
                 values = [round_num, question, num_answers, is_active]
 
+                # Add timer_seconds for Crowd Says
+                if mode == 'crowdsays':
+                    fields.append('timer_seconds')
+                    values.append(CROWDSAYS_TIMER_SECONDS)
+
                 # Get answers and counts for this round
                 for i in range(1, num_answers + 1):
                     answer = request.form.get(f'round{round_num}_answer{i}', '').strip()
                     fields.append(f'answer{i}')
                     values.append(answer)
 
-                    count = int(request.form.get(f'round{round_num}_answer{i}_count', 0) or 0)
-                    fields.append(f'answer{i}_count')
-                    values.append(count)
+                    if mode != 'crowdsays':
+                        count = int(request.form.get(f'round{round_num}_answer{i}_count', 0) or 0)
+                        fields.append(f'answer{i}_count')
+                        values.append(count)
 
                 answer1 = request.form.get(f'round{round_num}_answer1', '').strip()
                 if not answer1:
@@ -676,7 +832,9 @@ def generate_questions():
 
         past_questions_block = build_past_questions_block()
         questions_json_example = ', '.join([f'"Question {i}"' for i in range(1, num_rounds + 1)])
-        prompt = FEUD_QUESTIONS_PROMPT.format(
+        mode = get_game_mode()
+        base_prompt = CROWDSAYS_QUESTIONS_PROMPT if mode == 'crowdsays' else FEUD_QUESTIONS_PROMPT
+        prompt = base_prompt.format(
             past_questions_block=past_questions_block,
             num_rounds=num_rounds,
             questions_json_example=questions_json_example
@@ -709,8 +867,13 @@ def generate_round_data():
         questions = body['questions']
 
         # Build rounds config from request body, validated through build_rounds_config
+        mode = get_game_mode()
         submitted_config = body.get('rounds_config', None)
-        if submitted_config and len(submitted_config) == len(questions):
+        if mode == 'crowdsays':
+            from config import CROWDSAYS_ROUNDS_CONFIG
+            # Crowd Says: always 7 answers, adjust round count
+            rounds_config = [{"round": i, "answers": 7} for i in range(1, len(questions) + 1)]
+        elif submitted_config and len(submitted_config) == len(questions):
             per_round_answers = {}
             for item in submitted_config:
                 r = item.get('round') if isinstance(item, dict) else None
@@ -734,7 +897,8 @@ def generate_round_data():
         questions_block = '\n'.join(lines)
 
         past_questions_block = build_past_questions_block()
-        prompt = FEUD_ANSWERS_PROMPT.format(
+        base_prompt = CROWDSAYS_ANSWERS_PROMPT if mode == 'crowdsays' else FEUD_ANSWERS_PROMPT
+        prompt = base_prompt.format(
             questions_block=questions_block,
             past_questions_block=past_questions_block,
             num_rounds=num_rounds,

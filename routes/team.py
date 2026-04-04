@@ -9,13 +9,21 @@ import sqlite3
 import threading
 from flask import Blueprint, request, render_template, redirect, url_for, session, flash, jsonify
 
-from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED
+from config import logger, STARTUP_ID, reset_state, AI_SCORING_ENABLED, CROWDSAYS_TIMER_SECONDS
 from auth import team_session_valid
-from database import db_connect, get_setting
+from database import db_connect, get_setting, get_game_mode
 from extensions import socketio
 from routes.scoring import emit_leaderboard_update
 
 team_bp = Blueprint('team', __name__)
+
+
+def _generate_clue(answer):
+    """Generate a clue dict: first letter + remaining length."""
+    answer = answer.strip()
+    if not answer:
+        return {'letter': '', 'length': 0}
+    return {'letter': answer[0].upper(), 'length': len(answer) - 1}
 
 
 # ============= JOIN ROUTES =============
@@ -281,6 +289,22 @@ def team_play():
 
         active_round = conn.execute("SELECT * FROM rounds WHERE is_active = 1").fetchone()
         mobile_experience = get_setting('mobile_experience', 'advanced_no_pp')
+        mode = get_game_mode()
+
+        # Build Crowd Says extra data if applicable
+        cs_data = {}
+        if mode == 'crowdsays' and active_round:
+            clues = []
+            for i in range(1, active_round['num_answers'] + 1):
+                ans = active_round[f'answer{i}'] or ''
+                clues.append(_generate_clue(ans))
+            timer_enabled = get_setting('crowdsays_timer_enabled', 'true') == 'true'
+            timer_seconds = int(get_setting('crowdsays_timer_seconds', '45') or 45)
+            cs_data = {
+                'clues': clues,
+                'timer_enabled': timer_enabled,
+                'timer_seconds': timer_seconds,
+            }
 
         if not active_round:
             logger.debug(f"[TEAM] team_play() - no active round, showing waiting screen")
@@ -317,7 +341,8 @@ def team_play():
                                  submission=dict(submission),
                                  last_submission=last_submission,
                                  submission_count=submission_count,
-                                 mobile_experience=mobile_experience)
+                                 mobile_experience=mobile_experience,
+                                 **cs_data)
 
     logger.debug(f"[TEAM] team_play() - round {active_round['round_number']}, showing answer form ({active_round['num_answers']} answers)")
     return render_template('play.html',
@@ -328,7 +353,8 @@ def team_play():
                          num_answers=active_round['num_answers'],
                          round_id=active_round['id'],
                          submissions_closed=active_round['submissions_closed'],
-                         mobile_experience=mobile_experience)
+                         mobile_experience=mobile_experience,
+                         **cs_data)
 
 
 @team_bp.route('/play/submit', methods=['POST'])
@@ -354,10 +380,11 @@ def submit_answers():
             return jsonify({'success': False, 'error': 'No active session.'}), 401
         return redirect(url_for('team.join'))
 
-    # Validation: Tiebreaker must be 0-100
+    # Validation: Tiebreaker must be 0-100 (not required for crowdsays)
+    mode = get_game_mode()
     try:
         tiebreaker = int(request.form.get('tiebreaker', 0) or 0)
-        if tiebreaker < 0 or tiebreaker > 100:
+        if mode != 'crowdsays' and (tiebreaker < 0 or tiebreaker > 100):
             if is_ajax:
                 return jsonify({'success': False, 'error': 'Tiebreaker must be between 0 and 100.'}), 400
             flash('⚠️ Tiebreaker must be between 0 and 100', 'error')
@@ -402,7 +429,7 @@ def submit_answers():
 
         answers = {f'answer{i}': request.form.get(f'answer{i}', '').strip() for i in range(1, num_answers + 1)}
 
-        if not any(answers.values()):
+        if mode != 'crowdsays' and not any(answers.values()):
             if is_ajax:
                 return jsonify({'success': False, 'error': 'Please provide at least one answer.'}), 400
             flash('Please provide at least one answer.', 'error')

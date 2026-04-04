@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Play - Family Feud</title>
+    <title>Play - Survey Says</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ cache_bust }}">
     <style>
         :root {
@@ -46,6 +46,7 @@
             padding: 0;
             padding-top: 110px; /* Space for fixed header (increased for bigger question) */
             padding-bottom: 15px;
+            transition: padding-top 0.15s ease;
         }
         
         /* FIXED HEADER - Always visible at top */
@@ -1121,7 +1122,7 @@
         <div class="card">
             <div class="brand-logo-submitted">
                 <img src="{{ url_for('static', filename='logo.png') }}?v={{ cache_bust }}" alt="Game Night Guild">
-                <div class="game-title-submitted">Family Feud</div>
+                <div class="game-title-submitted">Survey Says</div>
                 <div class="round-complete-text">Round {{ round_num }}</div>
             </div>
             
@@ -1527,6 +1528,112 @@
         <div class="card">
             <!-- Collapsible Instructions -->
             <div class="instructions-toggle" onclick="toggleInstructions()">
+            {% if game_mode == 'crowdsays' %}
+                {# ===== CROWD SAYS MODE ===== #}
+                <div class="instructions-box" onclick="toggleInstructions()">
+                    <div class="instructions-header">
+                        <span>How Scoring Works (Tap to Expand)</span>
+                        <span class="toggle-icon" id="toggleIcon">▼</span>
+                    </div>
+                    <div class="instructions-content" id="instructionsContent">
+                        <p style="color: var(--text, #fff); font-size: 0.9em; margin: 12px 0 8px 0; line-height: 1.5;">
+                            Fill in the blanks! Use the letter clues to guess all 7 survey answers before time runs out.
+                        </p>
+                        <ul class="instructions-list">
+                            <li>100 points per correct answer (max 700)</li>
+                            <li>Speed bonus: submit faster for up to 200 extra points</li>
+                            <li>All 7 correct = 300 point perfect bonus!</li>
+                            <li>Max per round: 1,200 points</li>
+                        </ul>
+                    </div>
+                </div>
+
+                {% if timer_enabled|default(true) %}
+                <!-- Crowd Says Timer -->
+                <div id="cs-timer" style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="color: var(--text-accent); font-weight: bold;">Time Remaining</span>
+                        <span id="cs-timer-text" style="color: var(--text-accent); font-weight: bold; font-size: 1.3em;">{{ '%d:%02d' % ((timer_seconds|default(45)) // 60, (timer_seconds|default(45)) % 60) }}</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                        <div id="cs-timer-fill" style="width: 100%; height: 100%; background: var(--success, #28a745); border-radius: 4px; transition: width 1s linear;"></div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <form id="answerForm" method="POST" action="{{ url_for('team.submit_answers') }}?v={{ cache_bust }}" onsubmit="return validateAnswers(event)">
+                    <input type="hidden" name="round_id" value="{{ round_id }}">
+                    <input type="hidden" name="tiebreaker" value="0">
+
+                    {% for i in range(1, num_answers + 1) %}
+                    <div class="answer-group cs-answer-group" id="cs-answer-{{ i }}" style="position: relative;">
+                        <div class="answer-label" style="display: flex; align-items: center;">
+                            <span style="font-family: 'Courier New', monospace; color: var(--text-accent); font-weight: bold; font-size: 1.1em;">{{ clues[i-1].letter }}</span>
+                            <span style="display: inline-block; width: {{ clues[i-1].length }}ch; border-bottom: 2px solid var(--text-accent); margin-left: 6px;"></span>
+                        </div>
+                        <input type="text"
+                               name="answer{{ i }}"
+                               placeholder="Type your guess..."
+                               autocomplete="off" autocorrect="off" autocapitalize="off"
+                               class="cs-input"
+                               data-answer-num="{{ i }}">
+                    </div>
+                    {% endfor %}
+
+                    <button type="submit" id="cs-submit" style="margin-top: 10px;">
+                        Submit Answers
+                    </button>
+                </form>
+
+                <script>
+                var csTimerSeconds = {{ timer_seconds|default(45) }};
+                var csTimerEnabled = {{ 'true' if timer_enabled|default(true) else 'false' }};
+                var csTimerStarted = false;
+
+                // Timer countdown
+                function startCrowdSaysTimer() {
+                    if (csTimerStarted) return;
+                    csTimerStarted = true;
+                    var remaining = csTimerSeconds;
+                    var timerText = document.getElementById('cs-timer-text');
+                    var timerFill = document.getElementById('cs-timer-fill');
+
+                    var interval = setInterval(function() {
+                        remaining--;
+                        if (remaining <= 0) {
+                            clearInterval(interval);
+                            timerText.textContent = '0:00';
+                            timerFill.style.width = '0%';
+                            // Auto-submit
+                            var form = document.getElementById('answerForm');
+                            if (form && !formSubmitted) {
+                                formSubmitted = true;
+                                form.submit();
+                            }
+                            return;
+                        }
+                        var mins = Math.floor(remaining / 60);
+                        var secs = remaining % 60;
+                        timerText.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+                        timerFill.style.width = (remaining / csTimerSeconds * 100) + '%';
+
+                        // Change color when low
+                        if (remaining <= 10) {
+                            timerFill.style.background = '#dc3545';
+                        } else if (remaining <= 20) {
+                            timerFill.style.background = '#ffc107';
+                        }
+                    }, 1000);
+                }
+
+                // Start timer on page load (only if enabled)
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (csTimerEnabled) startCrowdSaysTimer();
+                });
+                </script>
+
+            {% else %}
+                {# ===== SHOWDOWN (FEUD) MODE ===== #}
                 <div class="instructions-header">
                     <span>How Scoring Works (Tap to Expand)</span>
                     <span class="toggle-icon" id="toggleIcon">▼</span>
@@ -1543,7 +1650,7 @@
                     </ul>
                 </div>
             </div>
-            
+
             <!-- Answer Progress -->
             <div class="answer-progress" id="answerProgress">
                 <span id="progressText">0 of {{ num_answers }} answers</span>
@@ -1554,38 +1661,39 @@
 
             <form id="answerForm" method="POST" action="{{ url_for('team.submit_answers') }}?v={{ cache_bust }}" onsubmit="return validateAnswers(event)">
                 <input type="hidden" name="round_id" value="{{ round_id }}">
-                
+
                 <!-- Answer Fields -->
                 {% for i in range(1, num_answers + 1) %}
                 <div class="answer-group">
                     <div class="answer-label">
                         Answer #{{ i }}
                     </div>
-                    <input type="text" 
-                           name="answer{{ i }}" 
+                    <input type="text"
+                           name="answer{{ i }}"
                            placeholder="Your answer #{{ i }}..."
                            required
                            autocomplete="off">
                 </div>
                 {% endfor %}
-                
+
                 <!-- Tiebreaker -->
                 <div class="tiebreaker-box">
                     <h3>🎯 Tiebreaker</h3>
-                    <input type="number" 
-                           name="tiebreaker" 
+                    <input type="number"
+                           name="tiebreaker"
                            placeholder="0-100"
                            min="0"
                            max="100"
                            required>
                     <p>How many out of 100 people gave the #1 answer?</p>
                 </div>
-                
+
                 <!-- Submit Button -->
                 <button type="submit">
                     Submit Answers
                 </button>
             </form>
+            {% endif %}
         </div>
     </div>
     
@@ -1893,7 +2001,7 @@
         }
 
         // ======== AUTO-SAVE ========
-        const AUTOSAVE_KEY = 'feud_answers_{{ code }}_round_{{ round_id }}';
+        const AUTOSAVE_KEY = 'feud_answers_{{ code }}_{{ cache_bust }}_round_{{ round_id }}';
 
         function saveAnswers() {
             const form = document.getElementById('answerForm');
@@ -1958,6 +2066,19 @@
             var form = document.getElementById('answerForm');
             if (!form) return;
 
+            // Prevent header taps from stealing focus / closing keyboard
+            var header = document.querySelector('.fixed-header');
+            if (header) {
+                function preventFocusSteal(e) {
+                    if (e.target.closest('.settings-gear')) return;
+                    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                        e.preventDefault();
+                    }
+                }
+                header.addEventListener('touchstart', preventFocusSteal);
+                header.addEventListener('mousedown', preventFocusSteal);
+            }
+
             // Restore saved answers + update progress
             restoreAnswers();
             updateProgress();
@@ -1975,19 +2096,18 @@
                 // Compact header on mobile keyboard open
                 input.addEventListener('focus', function() {
                     compactHeader();
-                    // Scroll input into view after header transition (manual calc to avoid iOS fixed-header bugs)
                     var self = this;
                     setTimeout(function() {
-                        var hdr = document.querySelector('.fixed-header');
-                        var headerHeight = hdr ? hdr.offsetHeight : 0;
-                        var inputRect = self.getBoundingClientRect();
-                        var targetY = window.scrollY + inputRect.top - headerHeight - 20;
-                        if (targetY > 0) {
-                            window.scrollTo({ top: targetY, behavior: 'smooth' });
-                        }
-                    }, 150);
+                        self.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
                 });
-                input.addEventListener('blur', expandHeader);
+                input.addEventListener('blur', function() {
+                    setTimeout(function() {
+                        if (!document.activeElement || document.activeElement.tagName !== 'INPUT') {
+                            expandHeader();
+                        }
+                    }, 100);
+                });
             });
 
             // Idle detection
@@ -2014,20 +2134,6 @@
             if (text) localStorage.setItem('broadcast_dismiss_' + btoa(text), 'true');
             document.getElementById('broadcast-banner').style.display = 'none';
         }
-    </script>
-
-    <script>
-        // Fix: Keep fixed header pinned when mobile keyboard opens
-        (function() {
-            if (!window.visualViewport) return;
-            var header = document.querySelector('.fixed-header');
-            if (!header) return;
-            function onViewportChange() {
-                header.style.top = window.visualViewport.offsetTop + 'px';
-            }
-            window.visualViewport.addEventListener('resize', onViewportChange);
-            window.visualViewport.addEventListener('scroll', onViewportChange);
-        })();
     </script>
 
     {% endif %}
@@ -2073,10 +2179,29 @@
         socket.on('round:started', (data) => {
             console.log('[WS] round:started', data);
             if (typeof scoresRevealed !== 'undefined') scoresRevealed = false;
-            if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
-                showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
-            } else {
+
+            var mode = data.mobile_experience || (typeof mobileExperience !== 'undefined' ? mobileExperience : 'advanced_no_pp');
+
+            if (mode === 'basic') {
+                // Basic mode: just reload
                 window.location.href = '/play';
+            } else if (mode === 'advanced_pp') {
+                // PP mode: show winner interstitial if available, else reload
+                if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
+                    showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
+                } else {
+                    window.location.href = '/play';
+                }
+            } else {
+                // advanced_no_pp: show winner interstitial if available, else show leaderboard briefly
+                if (data.previous_winner_team && typeof showWinnerInterstitial === 'function') {
+                    showWinnerInterstitial(data.previous_winner_team, data.previous_winner_score, data.previous_round_number || '', data.previous_question, data.previous_answers, data.previous_won_on_tiebreaker, data.previous_tiebreaker_answer);
+                } else if (data.leaderboard && typeof renderLeaderboard === 'function') {
+                    renderLeaderboard(data.leaderboard);
+                    setTimeout(function() { window.location.href = '/play'; }, 5000);
+                } else {
+                    window.location.href = '/play';
+                }
             }
         });
 
@@ -2161,11 +2286,21 @@
 
         socket.on('game:reset', (data) => {
             console.log('[WS] game:reset', data);
+            try {
+                Object.keys(localStorage).forEach(function(key) {
+                    if (key.startsWith('feud_answers_')) localStorage.removeItem(key);
+                });
+            } catch (e) {}
             window.location.href = '/';
         });
 
         socket.on('game:over', (data) => {
             console.log('[WS] game:over', data);
+            try {
+                Object.keys(localStorage).forEach(function(key) {
+                    if (key.startsWith('feud_answers_')) localStorage.removeItem(key);
+                });
+            } catch (e) {}
             socket.disconnect();
             function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 

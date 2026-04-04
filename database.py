@@ -262,6 +262,52 @@ def init_db():
                     logger.info(f"[MIGRATION] Migrated ai_model='{old_model}' -> {new_key}")
             conn.commit()
 
+        # Migration: Add answer7 + answer7_count to rounds table (for Crowd Says mode)
+        try:
+            conn.execute("SELECT answer7 FROM rounds LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding answer7/answer7_count columns to rounds table...")
+            conn.execute("ALTER TABLE rounds ADD COLUMN answer7 TEXT")
+            conn.execute("ALTER TABLE rounds ADD COLUMN answer7_count INTEGER")
+            conn.commit()
+            logger.info("Migration complete: answer7 columns added")
+
+        # Migration: Add timer_seconds to rounds table
+        try:
+            conn.execute("SELECT timer_seconds FROM rounds LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding timer_seconds column to rounds table...")
+            conn.execute("ALTER TABLE rounds ADD COLUMN timer_seconds INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Migration complete: timer_seconds column added")
+
+        # Migration: Add activated_at to rounds table (for speed bonus calculation)
+        try:
+            conn.execute("SELECT activated_at FROM rounds LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding activated_at column to rounds table...")
+            conn.execute("ALTER TABLE rounds ADD COLUMN activated_at TIMESTAMP")
+            conn.commit()
+            logger.info("Migration complete: activated_at column added")
+
+        # Migration: Add speed_bonus to submissions table
+        try:
+            conn.execute("SELECT speed_bonus FROM submissions LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding speed_bonus column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN speed_bonus INTEGER DEFAULT 0")
+            conn.commit()
+            logger.info("Migration complete: speed_bonus column added")
+
+        # Migration: Add answer7 to submissions table (for Crowd Says 7-answer rounds)
+        try:
+            conn.execute("SELECT answer7 FROM submissions LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Adding answer7 column to submissions table...")
+            conn.execute("ALTER TABLE submissions ADD COLUMN answer7 TEXT")
+            conn.commit()
+            logger.info("Migration complete: answer7 column added to submissions")
+
         # Initialize default settings if they don't exist
         default_settings = [
             ('allow_team_registration', 'true', 'Allow new teams to join'),
@@ -276,6 +322,9 @@ def init_db():
             ('ai_generation_model', '', 'AI model for round generation'),
             ('color_theme', 'gamenight', 'UI color theme'),
             ('tv_board_enabled', 'true', 'Enable TV board display feature'),
+            ('game_mode', 'surveysays', 'Active game mode: surveysays or crowdsays'),
+            ('crowdsays_timer_enabled', 'true', 'Enable countdown timer for Crowd Says rounds'),
+            ('crowdsays_timer_seconds', '45', 'Timer duration in seconds for Crowd Says rounds'),
         ]
 
         for key, value, description in default_settings:
@@ -328,6 +377,11 @@ def nuke_all_data():
     logger.info("[RESET] All data cleared - server is fresh, all teams must rejoin")
 
 # ============= SETTINGS HELPERS =============
+
+def get_game_mode():
+    """Get the active game mode (surveysays or crowdsays)."""
+    return get_setting('game_mode', 'surveysays')
+
 
 def get_setting(key, default=None):
     """Get a setting value from database, return default if not found"""
