@@ -506,6 +506,28 @@ def start_next_round():
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
 
+                # Fallback: if winner_code not set, determine winner from scored submissions
+                if not prev_winner or not prev_winner['winner_code']:
+                    fallback = conn.execute("""
+                        SELECT s.code, s.score, tc.team_name
+                        FROM submissions s
+                        JOIN team_codes tc ON s.code = tc.code
+                        WHERE s.round_id = ? AND s.host_submitted = 1
+                        ORDER BY s.score DESC, s.tiebreaker DESC
+                        LIMIT 1
+                    """, (active_round['id'],)).fetchone()
+                    if fallback:
+                        conn.execute("UPDATE rounds SET winner_code = ? WHERE id = ?",
+                                    (fallback['code'], active_round['id']))
+                        conn.commit()
+                        prev_winner = conn.execute("""
+                            SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                            FROM rounds r
+                            LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                            LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
+                            WHERE r.id = ?
+                        """, (active_round['id'],)).fetchone()
+
                 round_started_data = {
                     'round_id': next_round['id'],
                     'round_number': next_round['round_number'],
@@ -600,6 +622,28 @@ def start_next_round():
                     LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
                     WHERE r.id = ?
                 """, (active_round['id'],)).fetchone()
+
+                # Fallback: if winner_code not set, determine winner from scored submissions
+                if not prev_winner or not prev_winner['winner_code']:
+                    fallback = conn.execute("""
+                        SELECT s.code, s.score, tc.team_name
+                        FROM submissions s
+                        JOIN team_codes tc ON s.code = tc.code
+                        WHERE s.round_id = ? AND s.host_submitted = 1
+                        ORDER BY s.score DESC, s.tiebreaker DESC
+                        LIMIT 1
+                    """, (active_round['id'],)).fetchone()
+                    if fallback:
+                        conn.execute("UPDATE rounds SET winner_code = ? WHERE id = ?",
+                                    (fallback['code'], active_round['id']))
+                        conn.commit()
+                        prev_winner = conn.execute("""
+                            SELECT r.winner_code, r.round_number, tc.team_name, s.score
+                            FROM rounds r
+                            LEFT JOIN team_codes tc ON r.winner_code = tc.code
+                            LEFT JOIN submissions s ON r.winner_code = s.code AND r.id = s.round_id AND s.host_submitted = 1
+                            WHERE r.id = ?
+                        """, (active_round['id'],)).fetchone()
 
                 if prev_winner and prev_winner['winner_code']:
                     game_over_data['previous_winner_team'] = prev_winner['team_name']
